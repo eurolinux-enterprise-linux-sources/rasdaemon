@@ -2,7 +2,7 @@
 
 Name:			rasdaemon
 Version:		0.4.1
-Release:		24%{?dist}
+Release:		28%{?dist}
 Summary:		Utility to receive RAS error tracings
 Group:			Applications/System
 License:		GPLv2
@@ -77,6 +77,8 @@ Patch51: 0061-Add-Broadwell-DE-MSCOD-values.patch
 Patch52: 0062-Add-Broadwell-EP-EX-MSCOD-values.patch
 # Patch53 was submitted upstream but not merged yet
 Patch53: rasdaemon-dont_use_memerror_log_enable_on_knl.patch
+Patch54: 0063-add_support_for_knights_mill.patch
+Patch55: 0064-add_support_for_skylake.patch
 
 %description
 %{name} is a RAS (Reliability, Availability and Serviceability) logging tool.
@@ -143,6 +145,8 @@ an utility for reporting current error counts from the EDAC sysfs files.
 %patch51 -p1
 %patch52 -p1
 %patch53 -p1
+%patch54 -p1
+%patch55 -p1
 
 %build
 autoreconf -vfi
@@ -170,6 +174,21 @@ rm -rf %{buildroot}
 %{_sysconfdir}/ras/dimm_labels.d
 
 %changelog
+* Tue May 30 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-28.el7
+- Bump release [1448113]
+
+* Tue May 30 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-28.el7
+- Identify as Knights Mill systems as such [1448113]
+
+* Mon May 8 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-27.el7
+- Fixed error found by covscan in the last patch [1377467]
+
+* Tue Apr 11 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-26.el7
+- add support for Skylake client and server [1377467]
+
+* Wed Mar 22 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-25.el7
+- add support for Knights Mill [1433862]
+
 * Wed Aug 24 2016 Aristeu Rozanski <aris@redaht.com> 0.4.1-24.el7
 - don't use MemError Log Enable on Knights Landing [1273326]
 
