@@ -2,7 +2,7 @@
 
 Name:			rasdaemon
 Version:		0.4.1
-Release:		32%{?dist}
+Release:		33.1%{?dist}
 Summary:		Utility to receive RAS error tracings
 Group:			Applications/System
 License:		GPLv2
@@ -162,7 +162,8 @@ an utility for reporting current error counts from the EDAC sysfs files.
 
 %build
 autoreconf -vfi
-%configure --enable-mce --enable-aer --enable-sqlite3 --enable-extlog --enable-arm
+%configure --enable-mce --enable-aer --enable-sqlite3 --enable-extlog \
+	--enable-arm --enable-non-standard
 make %{?_smp_mflags}
 
 %install
@@ -186,6 +187,12 @@ rm -rf %{buildroot}
 %{_sysconfdir}/ras/dimm_labels.d
 
 %changelog
+* Thu Mar 29 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-33.1.el7
+- Refreshed build for zstream [1562017]
+
+* Mon Mar 19 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-33.el7
+- Enabled not standard errors [1520602]
+
 * Fri Feb 02 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-32.el7
 - Fixed covscan error [1520602]
 
