@@ -2,7 +2,7 @@
 
 Name:			rasdaemon
 Version:		0.4.1
-Release:		33.1%{?dist}
+Release:		35%{?dist}
 Summary:		Utility to receive RAS error tracings
 Group:			Applications/System
 License:		GPLv2
@@ -85,6 +85,7 @@ Patch58: 0067-rasdaemon-add-support-for-non-standard-CPER-section-.patch
 Patch59: 0068-rasdaemon-add-support-for-non-standard-error-decoder.patch
 Patch60: 0069-rasdaemon-add-support-for-ARM-events.patch
 Patch61: 0070-rasdaemon-ARM-fully-initialize-ras_arm_event.patch
+Patch62: 0071-rasdaemon-ras-mc-ctl-add-option-to-show-error-counts.patch
 
 %description
 %{name} is a RAS (Reliability, Availability and Serviceability) logging tool.
@@ -159,6 +160,7 @@ an utility for reporting current error counts from the EDAC sysfs files.
 %patch59 -p1
 %patch60 -p1
 %patch61 -p1
+%patch62 -p1
 
 %build
 autoreconf -vfi
@@ -187,8 +189,11 @@ rm -rf %{buildroot}
 %{_sysconfdir}/ras/dimm_labels.d
 
 %changelog
-* Thu Mar 29 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-33.1.el7
-- Refreshed build for zstream [1562017]
+* Fri Jan 25 2019 Aristeu Rozanski <aris@redhat.com> 0.4.1-35.el7
+- Add support to show error counts only [1573686]
+
+* Wed Jul 11 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-34.el7
+- Rebuilt [1558575]
 
 * Mon Mar 19 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-33.el7
 - Enabled not standard errors [1520602]
