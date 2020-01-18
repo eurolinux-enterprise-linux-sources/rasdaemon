@@ -1,0 +1,44 @@
+commit f20a366a9b7a32a1be6fc89e7546cc2b4cb690bf
+Author: Xie XiuQi <xiexiuqi@huawei.com>
+Date:   Thu May 8 20:07:19 2014 +0800
+
+    rasdaemon: fix mce numfield decoded error
+    
+    Some fields are missing in mce decode information, as below:
+    ...
+    rasdaemon: register inserted at db
+               <...>-31568 [000]  4023.214080: mce_record:
+    2014-05-07 15:51:16 +0800 bank=2, status= bd000000000000c0, MEMORY
+    CONTROLLER MS_CHANNEL0_ERR Transaction: Memory scrubbing error %s: %Lu
+     %s: %Lx
+     %s: %Lx
+     %s: %Lu
+     %s: %Lu
+     %s: %Lx
+    , mci=Uncorrected_error Error_enabled SRAO, n_errors=0 channel=0,
+    dimm=0, cpu_type= Intel Xeon 5500 series / Core i3/5/7
+    ("Nehalem/Westmere"), cpu= 0, socketid= 0, ip= 1eadbabe (INEXACT), cs=
+    73, misc= 8c, addr= 62b000, mcgstatus= 5 RIPV MCIP, mcgcap= 1c09,
+    apicid= 0
+    
+    "f->name" & "v" are missed to print in decode_numfield(), so fix it.
+    
+    Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+    Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+
+diff --git a/bitfield.c b/bitfield.c
+index b2895b4..07795a9 100644
+--- a/bitfield.c
++++ b/bitfield.c
+@@ -92,8 +92,9 @@ void decode_numfield(struct mce_event *e, uint64_t status,
+ 		uint64_t mask = (1ULL << (f->end - f->start + 1)) - 1;
+ 		uint64_t v = (status >> f->start) & mask;
+ 		if (v > 0 || f->force) {
+-			mce_snprintf(e->error_msg, "%%s: %s\n",
+-				     f->fmt ? f->fmt : "%Lu");
++			char fmt[32] = {0};
++			snprintf(fmt, 32, "%%s: %s\n", f->fmt ? f->fmt : "%Lu");
++			mce_snprintf(e->error_msg, fmt, f->name, v);
+ 		}
+ 	}
+ }

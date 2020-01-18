@@ -1,0 +1,42 @@
+From 78465e5047b226011c1a4c916c79c63fb6e68f71 Mon Sep 17 00:00:00 2001
+From: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Date: Fri, 14 Feb 2014 05:11:26 +0900
+Subject: [PATCH 22/32] mce-amd-k8.c: fix a warning
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+mce-amd-k8.c: In function ‘bank_name’:
+mce-amd-k8.c:250:22: warning: argument to ‘sizeof’ in ‘snprintf’ call is the same expression as the destination; did you mean to provide an explicit length? [-Wsizeof-pointer-memaccess]
+  snprintf(buf, sizeof(buf), "%s (bank=%d)", s, e->bank);
+                      ^
+
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ mce-amd-k8.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/mce-amd-k8.c b/mce-amd-k8.c
+index 5e21b55..8179f74 100644
+--- a/mce-amd-k8.c
++++ b/mce-amd-k8.c
+@@ -236,7 +236,6 @@ static void decode_k8_threashold(struct mce_event *e)
+ 
+ static void bank_name(struct mce_event *e)
+ {
+-	char *buf = e->bank_name;
+ 	const char *s;
+ 
+ 	if (e->bank < ARRAY_SIZE(k8bank))
+@@ -247,7 +246,7 @@ static void bank_name(struct mce_event *e)
+ 	else
+ 		return;		/* Use the generic parser for bank */
+ 
+-	snprintf(buf, sizeof(buf), "%s (bank=%d)", s, e->bank);
++	mce_snprintf(e->bank_name, "%s (bank=%d)", s, e->bank);
+ }
+ 
+ int parse_amd_k8_event(struct ras_events *ras, struct mce_event *e)
+-- 
+1.7.1
+

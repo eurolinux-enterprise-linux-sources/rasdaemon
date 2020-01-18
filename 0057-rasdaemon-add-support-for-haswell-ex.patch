@@ -1,0 +1,22 @@
+Based on mcelog code.
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+
+---
+ ras-mce-handler.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index 3976f90..23f2488 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -90,7 +90,8 @@ static enum cputype select_intel_cputype(struct ras_events *ras)
+ 			return CPU_HASWELL;
+ 		else if (mce->model == 0x3f)
+ 			return CPU_HASWELL_EPEX;
+-		else if (mce->model == 0x3d)
++		else if (mce->model == 0x3d || mce->model == 0x4f ||
++			 mce->model == 0x56)
+ 			return CPU_BROADWELL;
+ 		else if (mce->model == 0x57)
+ 			return CPU_KNIGHTS_LANDING;

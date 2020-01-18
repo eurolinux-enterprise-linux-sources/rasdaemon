@@ -1,0 +1,24 @@
+diff --git a/mce-intel.c b/mce-intel.c
+index bf68d9b..80e4b6f 100644
+--- a/mce-intel.c
++++ b/mce-intel.c
+@@ -470,7 +470,6 @@ int set_intel_imc_log(enum cputype cputype, unsigned ncpus)
+ 	case CPU_SANDY_BRIDGE_EP:
+ 	case CPU_IVY_BRIDGE_EPEX:
+ 	case CPU_HASWELL_EPEX:
+-	case CPU_KNIGHTS_LANDING:
+ 		msr = 0x17f;	/* MSR_ERROR_CONTROL */
+ 		bit = 0x2;	/* MemError Log Enable */
+ 		break;
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index b875512..f930fd1 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -228,7 +228,6 @@ int register_mce_handler(struct ras_events *ras, unsigned ncpus)
+ 	case CPU_SANDY_BRIDGE_EP:
+ 	case CPU_IVY_BRIDGE_EPEX:
+ 	case CPU_HASWELL_EPEX:
+-	case CPU_KNIGHTS_LANDING:
+ 		set_intel_imc_log(mce->cputype, ncpus);
+ 	default:
+ 		break;

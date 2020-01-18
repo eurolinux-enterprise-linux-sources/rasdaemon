@@ -1,0 +1,43 @@
+From d9fe70fe7db45618f7b46b81ebee85e7a8801870 Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <aris@redhat.com>
+Date: Mon, 10 Aug 2015 14:24:41 -0400
+Subject: [PATCH 1/5] rasdaemon: fix typos on ras-mc-ctl man page
+
+Fixed two markers and two typos in the documentation.
+
+Signed-off-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ man/ras-mc-ctl.8.in | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/man/ras-mc-ctl.8.in b/man/ras-mc-ctl.8.in
+index 7441b3a..60997dd 100644
+--- a/man/ras-mc-ctl.8.in
++++ b/man/ras-mc-ctl.8.in
+@@ -69,14 +69,14 @@ Display the configured labels for the current hardware, as
+ well as the current labels registered with EDAC.
+ .TP
+ .BI "--guess-labels"
+-Print DMI labels, when bank locator is available at the DMI table.
++Print DMI labels, when bank locator is available in the DMI table.
+ It helps to fill the labels database at @sysconfdir@/ras/dimm_labels.d/.
+ .TP
+ .BI "--labeldb="DB
+ Specify an alternate location for the labels database.
+ .TP
+ .BI "--delay="time
+-Specify a delay of \ftime\fR seconds before registering dimm labels.
++Specify a delay of \fBtime\fR seconds before registering DIMM labels.
+ Only meaninful if used together with --register-labels.
+ .TP
+ .BI "--layout
+@@ -121,4 +121,4 @@ back to parsing output of the \fBdmidecode\fR(8) utility. Use of this
+ utility will most often require that \fBras-mc-ctl\fR be run as root.
+ 
+ .SH SEE ALSO
+-\f\fBrasdaemon\fR(1)
++\fBrasdaemon\fR(1)
+-- 
+1.8.3.1
+

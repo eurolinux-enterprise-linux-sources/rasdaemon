@@ -1,0 +1,33 @@
+From 5dd11c60b84294a3c6ce5ccb0db726b3dce35b10 Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Tue, 26 May 2015 11:59:36 -0300
+Subject: [PATCH 07/13] rasdaemon: properly pring message strings in
+ decode_bitfield()
+
+Fix decode_bitfield() so that it does print message strings from the struct
+field table.
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Signed-off-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ bitfield.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/bitfield.c b/bitfield.c
+index 1dda30d..d6931c9 100644
+--- a/bitfield.c
++++ b/bitfield.c
+@@ -84,7 +84,8 @@ void decode_bitfield(struct mce_event *e, uint64_t status,
+ 				continue;
+ 			mce_snprintf(e->error_msg, "<%u:%llx>",
+ 				     f->start_bit, (long long)v);
+-		}
++		} else
++			mce_snprintf(e->error_msg, "%s", s);
+ 	}
+ }
+ 
+-- 
+1.8.3.1
+

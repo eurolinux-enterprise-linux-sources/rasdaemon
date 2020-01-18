@@ -1,0 +1,48 @@
+From a50a2ae341f8821d71a19d9a3c6ca345e1499e25 Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Wed, 17 Jun 2015 07:56:57 -0300
+Subject: [PATCH 5/5] rasdaemon: add internal errors of IA32_MC4_STATUS for
+ Haswell
+
+Now rasdaemon looks purposely omitting internal errors of
+IA32_MC4_STATUS for Haswell-family processors, which are described in
+Intel SDM vol3 Table 16-20. I think it's better to show these errors
+because mcelog does show them.
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel-haswell.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/mce-intel-haswell.c b/mce-intel-haswell.c
+index 0a817bf..b70e399 100644
+--- a/mce-intel-haswell.c
++++ b/mce-intel-haswell.c
+@@ -126,18 +126,17 @@ void hsw_decode_model(struct ras_events *ras, struct mce_event *e)
+         case 4:
+                 switch (EXTRACT(status, 0, 15) & ~(1ull << 12)) {
+                 case 0x402: case 0x403:
+-                        /* Internal errors */
++                        mce_snprintf(e->mcastatus_msg, "PCU Internal Errors");
+                         break;
+                 case 0x406:
+-                        /* Intel TXT errors */
++                        mce_snprintf(e->mcastatus_msg, "Intel TXT Errors");
+                         break;
+                 case 0x407:
+-                        /* Other UBOX Internal errors */
++                        mce_snprintf(e->mcastatus_msg, "Other UBOX Internal Errors");
+                         break;
+                 }
+-                if (EXTRACT(status, 16, 19))
+-                        /* PCU internal error */
+-                        ;
++                if (EXTRACT(status, 16, 17) && !EXTRACT(status, 18, 19))
++                        mce_snprintf(e->error_msg, "PCU Internal error");
+                 decode_bitfield(e, status, pcu_mc4);
+                 break;
+         case 5:
+-- 
+1.8.3.1
+

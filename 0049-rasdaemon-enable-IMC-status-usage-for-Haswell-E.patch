@@ -1,0 +1,43 @@
+From f892a390c55c0b350c57cda9d166a9cf331aa36f Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Tue, 26 May 2015 11:59:38 -0300
+Subject: [PATCH 09/13] rasdaemon: enable IMC status usage for Haswell-E
+
+Enable IMC status bank for Haswell-E, as described in Intel SDM Vol.3C
+Table 35-27.
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Signed-off-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel.c       | 1 +
+ ras-mce-handler.c | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/mce-intel.c b/mce-intel.c
+index 69ea00e..3684602 100644
+--- a/mce-intel.c
++++ b/mce-intel.c
+@@ -457,6 +457,7 @@ int set_intel_imc_log(enum cputype cputype, unsigned ncpus)
+ 	switch (cputype) {
+ 	case CPU_SANDY_BRIDGE_EP:
+ 	case CPU_IVY_BRIDGE_EPEX:
++	case CPU_HASWELL_EPEX:
+ 		msr = 0x17f;	/* MSR_ERROR_CONTROL */
+ 		bit = 0x2;	/* MemError Log Enable */
+ 		break;
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index 63f14fd..fb6db8a 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -221,6 +221,7 @@ int register_mce_handler(struct ras_events *ras, unsigned ncpus)
+ 	switch (mce->cputype) {
+ 	case CPU_SANDY_BRIDGE_EP:
+ 	case CPU_IVY_BRIDGE_EPEX:
++	case CPU_HASWELL_EPEX:
+ 		set_intel_imc_log(mce->cputype, ncpus);
+ 	default:
+ 		break;
+-- 
+1.8.3.1
+

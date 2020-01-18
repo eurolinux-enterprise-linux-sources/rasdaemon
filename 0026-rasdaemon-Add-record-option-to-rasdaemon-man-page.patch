@@ -1,0 +1,50 @@
+From d1b81490639f2608ecaf8fa50c24ac78c053fc2b Mon Sep 17 00:00:00 2001
+From: Betty Dall <betty.dall@hp.com>
+Date: Wed, 19 Mar 2014 14:59:47 -0600
+Subject: [PATCH 26/32] rasdaemon: Add record option to rasdaemon man page
+
+Add the already existing rasdaemon option 'record' to the rasdaemon man
+page. This option records events via sqlite3.
+
+Signed-off-by: Betty Dall <betty.dall@hp.com>
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ man/rasdaemon.1.in |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/man/rasdaemon.1.in b/man/rasdaemon.1.in
+index 5349fa3..7a8b60f 100644
+--- a/man/rasdaemon.1.in
++++ b/man/rasdaemon.1.in
+@@ -29,8 +29,10 @@ rasdaemon \- RAS daemon to log the RAS events.
+ 
+ .SH DESCRIPTION
+ 
+-The \fBrasdaemon\fR program is a daemon with monitors the RAS trace events
+-from /sys/kernel/debug/tracing, reporting them via syslog/journald.
++The \fBrasdaemon\fR program is a daemon which monitors the platform
++Reliablity, Availability and Serviceability (RAS) reports from the
++Linux kernel trace events. These trace events are logged in
++/sys/kernel/debug/tracing, reporting them via syslog/journald.
+ 
+ .SH OPTIONS
+ .TP
+@@ -51,8 +53,14 @@ Executes in foreground, printing the events at console. Useful for testing it,
+ and to be used by systemd or Unix System V respan.
+ If not specified, the program runs in daemon mode.
+ .TP
++.BI "--record"
++Record RAS events via Sqlite3. The Sqlite3 database has the benefit of
++keeping a persistent record of the RAS events. This feature is used with
++the ras-mc-ctl utility. Note that rasdaemon may be compiled without this
++feature.
++.TP
+ .BI "--version"
+-Prints the program version and exit.
++Print the program version and exit.
+ 
+ .SH SEE ALSO
+ \fBras-mc-ctl\fR(8)
+-- 
+1.7.1
+

@@ -1,0 +1,36 @@
+From 099af4056912faa28bf1385fffa77e7bbb468b93 Mon Sep 17 00:00:00 2001
+From: Mauro Carvalho Chehab <m.chehab@samsung.com>
+Date: Thu, 15 Aug 2013 12:43:02 -0300
+Subject: [PATCH 13/32] ras-mc-ctl: Improve parser
+
+Accept either . or : as layers separator at config files.
+
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ util/ras-mc-ctl.in |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index 48d9b00..f5a8ce5 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -481,14 +481,14 @@ sub parse_dimm_labels_file
+ 
+             next unless (my ($label, $info) = ($str =~ /^(.*)\s*:\s*(.*)$/i));
+ 
+-            unless ($info =~ /\d+(?:\.\d+)*/) {
++            unless ($info =~ /\d+(?:[\.\:]\d+)*/) {
+                 log_error ("$file: $line: Invalid syntax, ignoring: \"$_\"\n");
+                 next;
+             }
+ 
+             for my $target (split (/[, ]+/, $info)) {
+                 my $n;
+-                my ($mc, $top, $mid, $low, $extra) = ($target =~ /(\d+)(?:\.(\d+)){0,1}(?:\.(\d+)){0,1}(?:\.(\d+)){0,1}(?:\.(\d+)){0,1}/);
++                my ($mc, $top, $mid, $low, $extra) = ($target =~ /(\d+)(?:[\.\:](\d+)){0,1}(?:[\.\:](\d+)){0,1}(?:[\.\:](\d+)){0,1}(?:[\.\:](\d+)){0,1}/);
+ 
+                 if (defined($extra)) {
+                         die ("Error: Only up to 3 layers are currently supported on label db \"$file\"\n");
+-- 
+1.7.1
+

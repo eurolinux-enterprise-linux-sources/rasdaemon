@@ -1,0 +1,114 @@
+From 4bfa45f56e1500f1cfc8de3fd8d1228b11011e95 Mon Sep 17 00:00:00 2001
+From: Jakub Filak <jfilak@redhat.com>
+Date: Fri, 21 Feb 2014 15:54:09 +0100
+Subject: [PATCH 28/32] Make paths in the systemd services configurable
+
+The path to a binary depends on configuration, therefore it is better to
+not use hard coded strings.
+
+Signed-off-by: Jakub Filak <jfilak@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ Makefile.am                |   15 ++++++++++++++-
+ misc/ras-mc-ctl.service    |   10 ----------
+ misc/ras-mc-ctl.service.in |   10 ++++++++++
+ misc/rasdaemon.service     |   10 ----------
+ misc/rasdaemon.service.in  |   10 ++++++++++
+ 5 files changed, 34 insertions(+), 21 deletions(-)
+ delete mode 100644 misc/ras-mc-ctl.service
+ create mode 100644 misc/ras-mc-ctl.service.in
+ delete mode 100644 misc/rasdaemon.service
+ create mode 100644 misc/rasdaemon.service.in
+
+diff --git a/Makefile.am b/Makefile.am
+index c1668b4..0fa615f 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -1,6 +1,19 @@
+ ACLOCAL_AMFLAGS=-I m4
+ SUBDIRS = libtrace util man
+-EXTRA_DIST = misc/rasdaemon.service misc/ras-mc-ctl.service
++SYSTEMD_SERVICES_IN = misc/rasdaemon.service.in misc/ras-mc-ctl.service.in
++SYSTEMD_SERVICES = $(SYSTEMD_SERVICES_IN:.service.in=.service)
++EXTRA_DIST = $(SYSTEMD_SERVICES_IN)
++
++# This rule is needed because \@sbindir\@ is expanded to \${exec_prefix\}/sbin
++# during ./configure phase, therefore it is not possible to add .service.in
++# files to AC_CONFIG_FILES in configure.ac
++SUFFIXES = .service.in .service
++.service.in.service:
++	sed -e s,\@sbindir\@,$(sbindir),g $< > $@
++
++# This rule is needed because the service files must be generated on target
++# system after ./configure phase
++all-local: $(SYSTEMD_SERVICES)
+ 
+ sbin_PROGRAMS = rasdaemon
+ rasdaemon_SOURCES = rasdaemon.c ras-events.c ras-mc-handler.c \
+diff --git a/misc/ras-mc-ctl.service b/misc/ras-mc-ctl.service
+deleted file mode 100644
+index 8a09508..0000000
+--- a/misc/ras-mc-ctl.service
++++ /dev/null
+@@ -1,10 +0,0 @@
+-[Unit]
+-Description=Initialize EDAC v3.0.0 Drivers For Machine Hardware
+-
+-[Service]
+-Type=oneshot
+-ExecStart=/usr/sbin/ras-mc-ctl --register-labels
+-RemainAfterExit=yes
+-
+-[Install]
+-WantedBy=multi-user.target
+diff --git a/misc/ras-mc-ctl.service.in b/misc/ras-mc-ctl.service.in
+new file mode 100644
+index 0000000..8cb3651
+--- /dev/null
++++ b/misc/ras-mc-ctl.service.in
+@@ -0,0 +1,10 @@
++[Unit]
++Description=Initialize EDAC v3.0.0 Drivers For Machine Hardware
++
++[Service]
++Type=oneshot
++ExecStart=@sbindir@/ras-mc-ctl --register-labels
++RemainAfterExit=yes
++
++[Install]
++WantedBy=multi-user.target
+diff --git a/misc/rasdaemon.service b/misc/rasdaemon.service
+deleted file mode 100644
+index 36cdef5..0000000
+--- a/misc/rasdaemon.service
++++ /dev/null
+@@ -1,10 +0,0 @@
+-[Unit]
+-Description=RAS daemon to log the RAS events
+-After=syslog.target
+-
+-[Service]
+-ExecStart=/usr/local/sbin/rasdaemon -f
+-Restart=on-abort
+-
+-[Install]
+-WantedBy=multi-user.target
+diff --git a/misc/rasdaemon.service.in b/misc/rasdaemon.service.in
+new file mode 100644
+index 0000000..5e1f375
+--- /dev/null
++++ b/misc/rasdaemon.service.in
+@@ -0,0 +1,10 @@
++[Unit]
++Description=RAS daemon to log the RAS events
++After=syslog.target
++
++[Service]
++ExecStart=@sbindir@/rasdaemon -f
++Restart=on-abort
++
++[Install]
++WantedBy=multi-user.target
+-- 
+1.7.1
+

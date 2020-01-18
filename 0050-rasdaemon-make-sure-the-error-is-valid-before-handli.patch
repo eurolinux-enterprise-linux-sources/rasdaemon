@@ -1,0 +1,54 @@
+From 56913e2f2a5a6ddf8ab684c8d528e9ef1d55cfba Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Tue, 26 May 2015 11:59:39 -0300
+Subject: [PATCH 10/13] rasdaemon: make sure the error is valid before handling
+ ranks
+
+Fix "rank" handling according to the Bit 63 description in Intel SDM Vol.3C
+Table 16-23, that says "... Use this information only after there is valid
+first error info indicated by bit 62".
+Also fix invalid comparisons of unsigned variables "rank0" and "rank1".
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Signed-off-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel-haswell.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/mce-intel-haswell.c b/mce-intel-haswell.c
+index 3ac12f2..0a817bf 100644
+--- a/mce-intel-haswell.c
++++ b/mce-intel-haswell.c
+@@ -174,22 +174,20 @@ void hsw_decode_model(struct ras_events *ras, struct mce_event *e)
+ 
+ 	mce_snprintf(e->mc_location, "memory_channel=%d", chan);
+ 
+-	if (EXTRACT(e->misc, 62, 62))
++	if (EXTRACT(e->misc, 62, 62)) {
+ 		rank0 = EXTRACT(e->misc, 46, 50);
+-
+-	if (EXTRACT(e->misc, 63, 63))
+-		rank1 = EXTRACT(e->misc, 51, 55);
++		if (EXTRACT(e->misc, 63, 63))
++			rank1 = EXTRACT(e->misc, 51, 55);
++	}
+ 
+ 	/*
+ 	 * FIXME: The conversion from rank to dimm requires to parse the
+ 	 * DMI tables and call failrank2dimm().
+ 	 */
+-	if (rank0 >= 0 && rank1 >= 0)
++	if (rank0 != -1 && rank1 != -1)
+ 		mce_snprintf(e->mc_location, "ranks=%d and %d",
+ 				     rank0, rank1);
+-	else if (rank0 >= 0)
++	else if (rank0 != -1)
+ 		mce_snprintf(e->mc_location, "rank=%d", rank0);
+-	else
+-		mce_snprintf(e->mc_location, "rank=%d", rank1);
+ }
+ 
+-- 
+1.8.3.1
+

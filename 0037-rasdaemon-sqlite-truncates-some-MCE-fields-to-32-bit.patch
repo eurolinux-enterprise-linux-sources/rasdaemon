@@ -1,0 +1,73 @@
+commit 52e60e3050105a55e1ff2382979d5f370f398200
+Author: Luck, Tony <tony.luck@intel.com>
+Date:   Mon Apr 7 11:27:47 2014 -0700
+
+    rasdaemon: sqlite truncates some MCE fields to 32-bit
+    
+    The sqlite3_bind_int() function takes an "int" as the argument value to
+    save to the database. But some fields are wider than 32-bits.  Use
+    sqlite3_bind_int64() for the fields where we know values can exceed
+    4G.
+    
+    Before:
+    
+    # ./rasdaemon/util/ras-mc-ctl --errors
+     ...
+    MCE events:
+    1 2014-04-04 08:50:32 -0700 error: MEMORY CONTROLLER RD_CHANNEL0_ERR Transaction: Memory read error, mcg mcgstatus= 0, mci Corrected_error, mcgcap=0x07000c16, status=0x00010090, addr=0x35fcb9c0, misc=0x5026a686, walltime=0x5342e4f9, cpu=0x0000000e, cpuid=0x000306f1, apicid=0x00000020, socketid=0x00000001, bank=0x00000008
+    2 2014-04-04 08:50:35 -0700 error: MEMORY CONTROLLER RD_CHANNEL0_ERR Transaction: Memory read error, mcg mcgstatus= 0, mci Corrected_error, mcgcap=0x07000c16, status=0x00010090, addr=0x4187adc0, misc=0x4274f486, walltime=0x5342e4fc, cpu=0x0000000e, cpuid=0x000306f1, apicid=0x00000020, socketid=0x00000001, bank=0x00000007
+    3 2014-04-04 08:50:37 -0700 error: MEMORY CONTROLLER RD_CHANNEL0_ERR Transaction: Memory read error, mcg mcgstatus= 0, mci Corrected_error, mcgcap=0x07000c16, status=0x00010090, addr=0x52efc600, misc=0x50028286, walltime=0x5342e4fd, cpu=0x0000000e, cpuid=0x000306f1, apicid=0x00000020, socketid=0x00000001, bank=0x00000008
+    
+    After:
+    ./rasdaemon/util/ras-mc-ctl --errors
+     ...
+    1 2014-04-04 09:00:07 -0700 error: MEMORY CONTROLLER RD_CHANNEL0_ERR Transaction: Memory read error, mcg mcgstatus= 0, mci Corrected_error, mcgcap=0x07000c16, status=0x8c00004000010090, addr=0x45340a180, misc=0x140686886, walltime=0x5342e736, cpuid=0x000306f1, bank=0x00000008
+    2 2014-04-04 09:00:08 -0700 error: MEMORY CONTROLLER RD_CHANNEL0_ERR Transaction: Memory read error, mcg mcgstatus= 0, mci Corrected_error, mcgcap=0x07000c16, status=0x8c00004000010090, addr=0x44d6e4780, misc=0x15060e086, walltime=0x5342e737, cpuid=0x000306f1, bank=0x00000007
+    3 2014-04-04 09:00:10 -0700 error: MEMORY CONTROLLER RD_CHANNEL0_ERR Transaction: Memory read error, mcg mcgstatus= 0, mci Corrected_error, mcgcap=0x07000c16, status=0x8c00004000010090, addr=0x44cb64640, misc=0x140505086, walltime=0x5342e739, cpuid=0x000306f1, bank=0x00000008
+    
+    Signed-off-by: Tony Luck <tony.luck@intel.com>
+    Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+
+diff --git a/ras-record.c b/ras-record.c
+index e602edb..e5150ad 100644
+--- a/ras-record.c
++++ b/ras-record.c
+@@ -209,22 +209,22 @@ int ras_store_mce_record(struct ras_events *ras, struct mce_event *ev)
+ 		return 0;
+ 	log(TERM, LOG_INFO, "mce_record store: %p\n", priv->stmt_mce_record);
+ 
+-	sqlite3_bind_text(priv->stmt_mce_record,  1, ev->timestamp, -1, NULL);
+-	sqlite3_bind_int (priv->stmt_mce_record,  2, ev->mcgcap);
+-	sqlite3_bind_int (priv->stmt_mce_record,  3, ev->mcgstatus);
+-	sqlite3_bind_int (priv->stmt_mce_record,  4, ev->status);
+-	sqlite3_bind_int (priv->stmt_mce_record,  5, ev->addr);
+-	sqlite3_bind_int (priv->stmt_mce_record,  6, ev->misc);
+-	sqlite3_bind_int (priv->stmt_mce_record,  7, ev->ip);
+-	sqlite3_bind_int (priv->stmt_mce_record,  8, ev->tsc);
+-	sqlite3_bind_int (priv->stmt_mce_record,  9, ev->walltime);
+-	sqlite3_bind_int (priv->stmt_mce_record, 10, ev->cpu);
+-	sqlite3_bind_int (priv->stmt_mce_record, 11, ev->cpuid);
+-	sqlite3_bind_int (priv->stmt_mce_record, 12, ev->apicid);
+-	sqlite3_bind_int (priv->stmt_mce_record, 13, ev->socketid);
+-	sqlite3_bind_int (priv->stmt_mce_record, 14, ev->cs);
+-	sqlite3_bind_int (priv->stmt_mce_record, 15, ev->bank);
+-	sqlite3_bind_int (priv->stmt_mce_record, 16, ev->cpuvendor);
++	sqlite3_bind_text  (priv->stmt_mce_record,  1, ev->timestamp, -1, NULL);
++	sqlite3_bind_int   (priv->stmt_mce_record,  2, ev->mcgcap);
++	sqlite3_bind_int   (priv->stmt_mce_record,  3, ev->mcgstatus);
++	sqlite3_bind_int64 (priv->stmt_mce_record,  4, ev->status);
++	sqlite3_bind_int64 (priv->stmt_mce_record,  5, ev->addr);
++	sqlite3_bind_int64 (priv->stmt_mce_record,  6, ev->misc);
++	sqlite3_bind_int64 (priv->stmt_mce_record,  7, ev->ip);
++	sqlite3_bind_int64 (priv->stmt_mce_record,  8, ev->tsc);
++	sqlite3_bind_int64 (priv->stmt_mce_record,  9, ev->walltime);
++	sqlite3_bind_int   (priv->stmt_mce_record, 10, ev->cpu);
++	sqlite3_bind_int   (priv->stmt_mce_record, 11, ev->cpuid);
++	sqlite3_bind_int   (priv->stmt_mce_record, 12, ev->apicid);
++	sqlite3_bind_int   (priv->stmt_mce_record, 13, ev->socketid);
++	sqlite3_bind_int   (priv->stmt_mce_record, 14, ev->cs);
++	sqlite3_bind_int   (priv->stmt_mce_record, 15, ev->bank);
++	sqlite3_bind_int   (priv->stmt_mce_record, 16, ev->cpuvendor);
+ 
+ 	sqlite3_bind_text(priv->stmt_mce_record, 17, ev->bank_name, -1, NULL);
+ 	sqlite3_bind_text(priv->stmt_mce_record, 18, ev->error_msg, -1, NULL);

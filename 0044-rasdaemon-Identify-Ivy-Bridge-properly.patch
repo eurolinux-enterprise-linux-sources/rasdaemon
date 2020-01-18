@@ -1,0 +1,38 @@
+From 66021c20c92b5df16b5c8dae4fb664788fa40376 Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 18 May 2015 14:19:31 -0300
+Subject: [PATCH 04/13] rasdaemon: Identify Ivy Bridge properly
+
+This patch is based on b29cc4d615cead87cbc163ada0645b10c5b1217d (mcelog)
+	mcelog: Identify Ivy Bridge properly
+
+	Uniquely identify Ivy Bridge even though the machine checks are the same
+	for Sandy Bridge and Ivy Bridge.  This makes the output for the processor
+	display "Ivy Bridge".
+
+	Signed-off-by: Prarit Bhargava <prarit@redhat.com>
+	Cc: tony.luck@intel.com
+	Signed-off-by: Andi Kleen <ak@linux.intel.com>
+
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ ras-mce-handler.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index d2de096..07e298f 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -75,7 +75,7 @@ static enum cputype select_intel_cputype(struct ras_events *ras)
+ 			return CPU_NEHALEM;
+ 		else if (mce->model == 0x2e || mce->model == 0x2f)
+ 			return CPU_XEON75XX;
+-		else if (mce->model == 0x2a || mce->model == 0x3a)
++		else if (mce->model == 0x2a)
+ 			return CPU_SANDY_BRIDGE;
+ 		else if (mce->model == 0x2d)
+ 			return CPU_SANDY_BRIDGE_EP;
+-- 
+1.8.3.1
+

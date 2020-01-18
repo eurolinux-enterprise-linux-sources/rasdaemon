@@ -1,0 +1,53 @@
+From dc811f88b1bd5ac33faa1606c3a3ce4d3bc0b7ed Mon Sep 17 00:00:00 2001
+From: Mauro Carvalho Chehab <mchehab@redhat.com>
+Date: Fri, 31 May 2013 16:40:40 -0300
+Subject: [PATCH 10/32] ras-mc-ctl: Fix the name of the error table data
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+---
+ util/ras-mc-ctl.in |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index 30d3078..48d9b00 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -898,9 +898,9 @@ sub errors
+         $out .= "$id $time $count $type error(s): $msg at $label location: $mc:$top:$mid:$low, addr $addr, grain $grain, syndrome $syndrome $detail\n";
+     }
+     if ($out ne "") {
+-        print "PCIe AER events:\n$out\n";
++        print "Memory controller events:\n$out\n";
+     } else {
+-        print "No PCIe AER errors.\n\n";
++        print "No Memory errors.\n\n";
+     }
+     $query_handle->finish;
+ 
+@@ -914,9 +914,9 @@ sub errors
+         $out .= "$id $time $type error: $msg\n";
+     }
+     if ($out ne "") {
+-        print "MCE events:\n$out\n";
++        print "PCIe AER events:\n$out\n";
+     } else {
+-        print "No MCE errors.\n\n";
++        print "No PCIe AER errors.\n\n";
+     }
+     $query_handle->finish;
+ 
+@@ -952,9 +952,9 @@ sub errors
+ 	$out .= "\n";
+     }
+     if ($out ne "") {
+-        print "Memory controller events:\n$out\n";
++        print "MCE events:\n$out\n";
+     } else {
+-        print "No Memory errors.\n\n";
++        print "No MCE errors.\n\n";
+     }
+     $query_handle->finish;
+ 
+-- 
+1.7.1
+

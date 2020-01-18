@@ -1,0 +1,36 @@
+From 349da4c3d63ec6dceef66a405561984561d31582 Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Wed, 10 Jun 2015 20:49:55 -0300
+Subject: [PATCH 3/5] rasdaemon: unnecessary comma for empty mc_location string
+
+Into the /var/log/messages, rasdaemon sometimes prints an unnecessary
+comma ", " between mca= and cpu_type= like below:
+
+Jun  9 02:44:39 localhost rasdaemon: <...>-4585  [1638893312]  1031.109000: mce_record:           2015-06-08 10:07:28 +0900 bank=3, status= 9c0000000000017a, mci=Corrected_error Error_enabled, mca=Generic CACHE Level-2 Eviction Error, , cpu_type= Intel Xeon v3 (Haswell) EP/EX, cpu= 1, socketid= 0, misc= 4004000000000080, addr= 204fffffff, mcgstatus= 0, mcgcap= 7000c16, apicid= 2
+
+That's the comma for mc_location which is printed even if mc_location is
+empty due to a wrong if condition.
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Acked-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ ras-mce-handler.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index fb6db8a..07252a0 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -278,7 +278,7 @@ static void report_mce_event(struct ras_events *ras,
+ 	if (*e->user_action)
+ 		trace_seq_printf(s, " %s", e->user_action);
+ 
+-	if (e->mc_location)
++	if (*e->mc_location)
+ 		trace_seq_printf(s, ", %s", e->mc_location);
+ 
+ #if 0
+-- 
+1.8.3.1
+

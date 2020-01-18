@@ -1,0 +1,118 @@
+From d7453479e96693ebb5e17b285adf915b67095aad Mon Sep 17 00:00:00 2001
+From: Jakub Filak <jfilak@redhat.com>
+Date: Wed, 2 Apr 2014 15:03:44 +0200
+Subject: [PATCH 31/32] Correct ABRT report data
+
+Remove '\0' byte from 'PUT' message because this was superfluous.
+
+Replaced 'BASENAME' item with 'TYPE' item because the first one is no
+longer supported by abrtd and the second one is required. Basically the
+later is a substitute for the first one.
+
+Removed the closing message which is not supported by abrtd. abrtd
+considers that message as a part of the problem report.
+
+Removed a superfluous space from 'Backtrace'.
+
+Signed-off-by: Jakub Filak <jfilak@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ ras-report.c |   41 ++++-------------------------------------
+ 1 files changed, 4 insertions(+), 37 deletions(-)
+
+diff --git a/ras-report.c b/ras-report.c
+index d3e4a79..0a05732 100644
+--- a/ras-report.c
++++ b/ras-report.c
+@@ -51,8 +51,8 @@ static int commit_report_basic(int sockfd){
+ 	 * ABRT server protocol
+ 	 */
+ 	sprintf(buf, "PUT / HTTP/1.1\r\n\r\n");
+-	rc = write(sockfd, buf, strlen(buf) + 1);
+-	if(rc < strlen(buf) + 1){
++	rc = write(sockfd, buf, strlen(buf));
++	if(rc < strlen(buf)){
+ 		return -1;
+ 	}
+ 
+@@ -68,7 +68,7 @@ static int commit_report_basic(int sockfd){
+ 		return -1;
+ 	}
+ 
+-	sprintf(buf, "BASENAME=%s", "rasdaemon");
++	sprintf(buf, "TYPE=%s", "ras");
+ 	rc = write(sockfd, buf, strlen(buf) + 1);
+ 	if(rc < strlen(buf) + 1){
+ 		return -1;
+@@ -77,31 +77,13 @@ static int commit_report_basic(int sockfd){
+ 	return 0;
+ }
+ 
+-/*
+- *  add "DONE" string to finish message.
+- */
+-static int commit_report_done(int sockfd){
+-	int rc = -1;
+-
+-	if(sockfd < 0){
+-		return -1;
+-	}
+-
+-	rc = write(sockfd, "DONE\0", strlen("DONE\0"));
+-	if(rc < strlen("DONE\0")){
+-		return -1;
+-	}
+-
+-	return 0;
+-}
+-
+ static int set_mc_event_backtrace(char *buf, struct ras_mc_event *ev){
+ 	char bt_buf[MAX_BACKTRACE_SIZE];
+ 
+ 	if(!buf || !ev)
+ 		return -1;
+ 
+-	sprintf(bt_buf, "BACKTRACE= "	\
++	sprintf(bt_buf, "BACKTRACE="	\
+ 						"timestamp=%s\n"	\
+ 						"error_count=%d\n"	\
+ 						"error_type=%s\n"	\
+@@ -298,11 +280,6 @@ int ras_report_mc_event(struct ras_events *ras, struct ras_mc_event *ev){
+ 		goto mc_fail;
+ 	}
+ 
+-	rc = commit_report_done(sockfd);
+-	if(rc < 0){
+-		goto mc_fail;
+-	}
+-
+ 	done = 1;
+ 
+ mc_fail:
+@@ -353,11 +330,6 @@ int ras_report_aer_event(struct ras_events *ras, struct ras_aer_event *ev){
+ 		goto aer_fail;
+ 	}
+ 
+-	rc = commit_report_done(sockfd);
+-	if(rc < 0){
+-		goto aer_fail;
+-	}
+-
+ 	done = 1;
+ 
+ aer_fail:
+@@ -408,11 +380,6 @@ int ras_report_mce_event(struct ras_events *ras, struct mce_event *ev){
+ 		goto mce_fail;
+ 	}
+ 
+-	rc = commit_report_done(sockfd);
+-	if(rc < 0){
+-		goto mce_fail;
+-	}
+-
+ 	done = 1;
+ 
+ mce_fail:
+-- 
+1.7.1
+

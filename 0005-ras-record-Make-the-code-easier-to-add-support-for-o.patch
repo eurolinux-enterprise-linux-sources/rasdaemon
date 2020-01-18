@@ -1,0 +1,60 @@
+From 93217061a4b1dc7f287f2715aadc621d2c00425d Mon Sep 17 00:00:00 2001
+From: Mauro Carvalho Chehab <mchehab@redhat.com>
+Date: Fri, 31 May 2013 13:53:18 -0300
+Subject: [PATCH 05/32] ras-record: Make the code easier to add support for other tables
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+---
+ ras-record.c |   25 ++++++++-----------------
+ 1 files changed, 8 insertions(+), 17 deletions(-)
+
+diff --git a/ras-record.c b/ras-record.c
+index 298977e..36b3373 100644
+--- a/ras-record.c
++++ b/ras-record.c
+@@ -143,10 +143,14 @@ static int ras_mc_prepare_stmt(struct sqlite3_priv *priv,
+ #endif
+ 
+ 	rc = sqlite3_prepare_v2(priv->db, sql, -1, stmt, NULL);
+-	if (rc != SQLITE_OK)
++	if (rc != SQLITE_OK) {
+ 		log(TERM, LOG_ERR,
+ 		    "Failed to prepare insert db at table %s (db %s): error = %s\n",
+ 		    db_tab->name, SQLITE_RAS_DB, sqlite3_errmsg(priv->db));
++		stmt = NULL;
++	} else {
++		log(TERM, LOG_INFO, "Recording %s events\n", db_tab->name);
++	}
+ 
+ 	return rc;
+ }
+@@ -225,23 +229,10 @@ int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras)
+ 	priv->db = db;
+ 
+ 	rc = ras_mc_create_table(priv, &mc_event_tab);
+-	if (rc != SQLITE_OK) {
+-		sqlite3_close(db);
+-		free(priv);
+-		return -1;
+-	}
++	if (rc == SQLITE_OK)
++		rc = ras_mc_prepare_stmt(priv, &priv->stmt_mc_event, &mc_event_tab);
+ 
+-	rc = ras_mc_prepare_stmt(priv, &priv->stmt_mc_event, &mc_event_tab);
+-	if (rc == SQLITE_OK) {
+-		log(TERM, LOG_INFO,
+-		    "cpu %u: Recording events at %s\n",
+-		    cpu, SQLITE_RAS_DB);
+-		ras->db_priv = priv;
+-	} else {
+-		sqlite3_close(db);
+-		free(priv);
+-		return -1;
+-	}
+ 
++	ras->db_priv = priv;
+ 	return 0;
+ }
+-- 
+1.7.1
+

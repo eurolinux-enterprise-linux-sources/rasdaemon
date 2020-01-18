@@ -1,0 +1,38 @@
+From 5e8fb95e2f6dd3f427e0ae5d7d066aeb6d61fd0f Mon Sep 17 00:00:00 2001
+From: Mauro Carvalho Chehab <mchehab@redhat.com>
+Date: Wed, 29 May 2013 21:53:58 -0300
+Subject: [PATCH 01/32] ras-mc-ctl: Improve error summary to show label and mc
+
+Both information are useful for the users, even on summary.
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+---
+ util/ras-mc-ctl.in |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index 32c4edb..5b1ca4d 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -827,15 +827,15 @@ sub summary
+ 
+     my $dbh = DBI->connect("dbi:SQLite:dbname=$dbname", "", "", {});
+ 
+-    my $query = "select top_layer,middle_layer,lower_layer, count(*) from mc_event group by top_layer,middle_layer,lower_layer";
++    my $query = "select label, mc, top_layer,middle_layer,lower_layer, count(*) from mc_event group by label,mc,top_layer,middle_layer,lower_layer";
+     my $query_handle = $dbh->prepare($query);
+     $query_handle->execute();
+ 
+-    $query_handle->bind_columns(\my($top, $mid, $low, $count));
++    $query_handle->bind_columns(\my($label, $mc, $top, $mid, $low, $count));
+ 
+     print "Memory controller events summary:\n";
+     while($query_handle->fetch()) {
+-        print "location: $top:$mid:$low errors: $count\n";
++        print "DIMM Label(s): '$label' location: $mc:$top:$mid:$low errors: $count\n";
+     }
+ 
+     $query_handle->finish;
+-- 
+1.7.1
+

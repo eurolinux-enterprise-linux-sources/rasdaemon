@@ -1,0 +1,43 @@
+From 59f6c44864f914a189cb924dd8fea14cc314bf3f Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 23 Jun 2014 15:43:41 -0400
+Subject: [PATCH 1/2] rasdaemon: handle failures of snprintf()
+
+Florian Weimer found that in bitfield_msg() the return value of
+snprintf() is used to calculate length ignoring that it can return a
+negative number. This patch makes bitfield_msg() to stop writing in such
+case.
+
+Reference: https://bugzilla.redhat.com/show_bug.cgi?id=1035741
+
+Reported-by: Florian Weimer <fweimer@redhat.com>
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+---
+ bitfield.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/bitfield.c b/bitfield.c
+index b2895b4..1690f15 100644
+--- a/bitfield.c
++++ b/bitfield.c
+@@ -41,6 +41,8 @@ unsigned bitfield_msg(char *buf, size_t len, const char **bitarray,
+ 		if (status & (1 <<  (i + bit_offset))) {
+ 			if (p != buf) {
+ 				n = snprintf(p, len, ", ");
++				if (n < 0)
++					break;
+ 				len -= n;
+ 				p += n;
+ 			}
+@@ -48,6 +50,8 @@ unsigned bitfield_msg(char *buf, size_t len, const char **bitarray,
+ 				n = snprintf(p, len, "BIT%d", i + bit_offset);
+ 			else
+ 				n = snprintf(p, len, "%s", bitarray[i]);
++			if (n < 0)
++				break;
+ 			len -= n;
+ 			p += n;
+ 		}
+-- 
+1.7.1
+

@@ -1,0 +1,50 @@
+From bd6c78d89f4e934fafb1136a15efc0d6df4635ed Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 18 May 2015 14:19:33 -0300
+Subject: [PATCH 06/13] rasdaemon: add support for Knights Landing
+
+Patch based on mcelog.
+
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ ras-mce-handler.c | 3 +++
+ ras-mce-handler.h | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index e059b92..63f14fd 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -50,6 +50,7 @@ static char *cputype_name[] = {
+ 	[CPU_HASWELL] = "Haswell",
+ 	[CPU_HASWELL_EPEX] = "Intel Xeon v3 (Haswell) EP/EX",
+ 	[CPU_BROADWELL] = "Broadwell",
++	[CPU_KNIGHTS_LANDING] = "Knights Landing",
+ };
+ 
+ static enum cputype select_intel_cputype(struct ras_events *ras)
+@@ -91,6 +92,8 @@ static enum cputype select_intel_cputype(struct ras_events *ras)
+ 			return CPU_HASWELL_EPEX;
+ 		else if (mce->model == 0x3d)
+ 			return CPU_BROADWELL;
++		else if (mce->model == 0x57)
++			return CPU_KNIGHTS_LANDING;
+ 
+ 		if (mce->model > 0x1a) {
+ 			log(ALL, LOG_INFO,
+diff --git a/ras-mce-handler.h b/ras-mce-handler.h
+index ba01f55..28aad00 100644
+--- a/ras-mce-handler.h
++++ b/ras-mce-handler.h
+@@ -45,6 +45,7 @@ enum cputype {
+ 	CPU_HASWELL,
+ 	CPU_HASWELL_EPEX,
+ 	CPU_BROADWELL,
++	CPU_KNIGHTS_LANDING,
+ };
+ 
+ struct mce_event {
+-- 
+1.8.3.1
+

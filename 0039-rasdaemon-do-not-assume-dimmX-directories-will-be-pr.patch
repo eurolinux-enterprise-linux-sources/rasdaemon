@@ -1,0 +1,84 @@
+From 7e79fa94dc6c294cd731c0c684b277dd4811c5db Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <aris@redhat.com>
+Date: Fri, 15 Aug 2014 13:50:58 -0400
+Subject: [PATCH 3/4] rasdaemon: do not assume dimmX/ directories will be
+ present
+
+While finding the labels, size and location, ras-mc-ctl will search /sys for
+the files and calculate the location. When it uses the location trying to map
+back to files to print labels or write labels, it'll just assume dimm*
+directories exist which is not correct while using drivers like amd64_edac.
+This patch adds two new hashes to store the location and the label file path
+so it can be used later.
+
+Signed-off-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ util/ras-mc-ctl.in | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index 110262f..7b6d798 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -45,6 +45,8 @@ my %conf        = ();
+ my %bus         = ();
+ my %dimm_size   = ();
+ my %dimm_node   = ();
++my %dimm_label_file = ();
++my %dimm_location = ();
+ my %csrow_size  = ();
+ my %rank_size   = ();
+ my %csrow_ranks = ();
+@@ -278,6 +280,9 @@ sub parse_dimm_nodes
+         my $str_loc = join(':', $mc, @pos);
+         $dimm_size{$str_loc} = $size;
+         $dimm_node{$str_loc} = $dimm;
++        $file =~ s/size/dimm_label/;
++        $dimm_label_file{$str_loc} = $file;
++        $dimm_location{$str_loc} = $location;
+ 
+         return;
+     }
+@@ -557,12 +562,14 @@ sub read_dimm_label
+ 
+     my $dimm = $dimm_node{$pos};
+ 
+-    my $file = "$sysfs/mc$mc/dimm$dimm/dimm_label";
++    my $dimm_label_file = $dimm_label_file{$pos};
+ 
+-    return ("$pos missing") unless -f $file;
++    my $location = $dimm_location{$pos};
+ 
+-    if (!open (LABEL, "$file")) {
+-        warn "Failed to open $file: $!\n";
++    return ("label missing", "$pos missing") unless -f $dimm_label_file;
++
++    if (!open (LABEL, "$dimm_label_file")) {
++        warn "Failed to open $dimm_label_file: $!\n";
+         return ("Error");
+     }
+ 
+@@ -570,7 +577,7 @@ sub read_dimm_label
+ 
+     close (LABEL);
+ 
+-    $pos = "mc$mc " . qx(cat $sysfs/mc$mc/dimm$dimm/dimm_location);
++    $pos = "mc$mc $location";
+ 
+     return ($label, $pos);
+ }
+@@ -587,9 +594,7 @@ sub get_dimm_label_node
+ 
+     return "" if (!defined($dimm_node{$pos}));
+ 
+-    my $dimm = $dimm_node{$pos};
+-
+-    return "$sysfs/mc$mc/dimm$dimm/dimm_label";
++    return "$dimm_label_file{$pos}";
+ }
+ 
+ 
+-- 
+1.8.3.1
+

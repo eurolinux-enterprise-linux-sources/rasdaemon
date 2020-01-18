@@ -1,0 +1,57 @@
+From 9136d7422a6b53c50a920f3dd2539bf7fcd4fdf5 Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Fri, 12 Jun 2015 06:35:37 -0300
+Subject: [PATCH 4/5] rasdaemon: use MCA error msg as error_msg
+
+In the case of machine-checks which do not have a model-specific MCA
+error code but have an architectural code only, mce_event.error_msg
+becomes empty then you don't know what happened.
+
+(snip)
+MCE records summary:
+	1  errors
+          ^
+          empty!
+
+(snip)
+MCE events:
+1 2015-06-12 00:21:46 +0900 error: , mcg mcgstatus= 0, mci Corrected_error
+                                  ^
+                                empty!
+
+Error_enabled, mcgcap=0x07000c16, status=0x9c0000000000017a, addr=0x204fffffff, misc=0x4004000000000080, walltime=0x557b0db2, cpu=0x00000001, cpuid=0x000306f3, apicid=0x00000002, bank=0x00000003
+
+In such a case, let's use the content of mcastatus_msg as error_msg
+instead.
+
+(snip)
+MCE records summary:
+	1 Generic CACHE Level-2 Eviction Error errors
+(snip)
+MCE events:
+1 2015-06-12 02:39:04 +0900 error: Generic CACHE Level-2 Eviction Error, mcg mcgstatus= 0, mci Corrected_error Error_enabled, mcgcap=0x07000c16, status=0x9c0000000000017a, addr=0x204fffffff, misc=0x4004000000000080, walltime=0x557b1f22, cpu=0x00000001, cpuid=0x000306f3, apicid=0x00000002, bank=0x00000003
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Acked-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ ras-mce-handler.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index 07252a0..3976f90 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -411,6 +411,9 @@ int ras_mce_event_handler(struct trace_seq *s,
+ 	if (rc)
+ 		return rc;
+ 
++	if (!*e.error_msg && *e.mcastatus_msg)
++		mce_snprintf(e.error_msg, "%s", e.mcastatus_msg);
++
+ 	report_mce_event(ras, record, s, &e);
+ 
+ #ifdef HAVE_SQLITE3
+-- 
+1.8.3.1
+

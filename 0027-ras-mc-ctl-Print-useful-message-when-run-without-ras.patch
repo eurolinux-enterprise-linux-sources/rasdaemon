@@ -1,0 +1,45 @@
+From caa44c3946ddc900896830297c28b90ce5b9034b Mon Sep 17 00:00:00 2001
+From: Betty Dall <betty.dall@hp.com>
+Date: Wed, 19 Mar 2014 15:54:56 -0600
+Subject: [PATCH 27/32] ras-mc-ctl: Print useful message when run without rasdaemon -r
+
+The utility script ras-mc-ctl requires that rasdaemon --record be run
+to create the me_event table in the SQLite database. The current behaviour
+is this:
+[root@sa1 util]# ras-mc-ctl --errors
+DBD::SQLite::db prepare failed: no such table: mc_event at
+/usr/local/sbin/ras-mc-ctl line 914.
+Can't call method "execute" on an undefined value at
+/usr/local/sbin/ras-mc-ctl line 915.
+
+With this change, the user sees:
+[root@sa1 util]# ras-mc-ctl --errors
+DBD::SQLite::db prepare failed: no such table: mc_event at
+/usr/local/sbin/ras-mc-ctl line 914.
+ras-mc-ctl: Error: mc_event table missing from
+/usr/local/var/lib/rasdaemon/ras-mc_event.db. Run 'rasdaemon --record'.
+
+Signed-off-by: Betty Dall <betty.dall@hp.com>
+Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+---
+ util/ras-mc-ctl.in |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
+
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index 196a643..e9f9c59 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -912,6 +912,10 @@ sub errors
+     # Memory controller mc_event errors
+     $query = "select id, timestamp, err_count, err_type, err_msg, label, mc, top_layer,middle_layer,lower_layer, address, grain, syndrome, driver_detail from mc_event order by id";
+     $query_handle = $dbh->prepare($query);
++    if (!$query_handle) {
++        log_error ("mc_event table missing from $dbname. Run 'rasdaemon --record'.\n");
++        exit -1
++    }
+     $query_handle->execute();
+     $query_handle->bind_columns(\($id, $time, $count, $type, $msg, $label, $mc, $top, $mid, $low, $addr, $grain, $syndrome, $detail));
+     $out = "";
+-- 
+1.7.1
+

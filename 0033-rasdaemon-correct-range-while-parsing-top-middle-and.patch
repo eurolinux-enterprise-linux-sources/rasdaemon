@@ -1,0 +1,46 @@
+From 5ba31285710e85c7d3688e536cd54180321964e4 Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 23 Jun 2014 16:31:50 -0400
+Subject: [PATCH 2/2] rasdaemon: correct range while parsing top, middle and lower layers
+
+{top,middle,lower}_layer are signed char, therefore will never be 255.
+
+Reference: https://bugzilla.redhat.com/show_bug.cgi?id=1035746
+
+Reported-by: Florian Weimer <fweimer@redhat.com>
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+---
+ ras-mc-handler.c |   14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
+
+--- upstream.orig/ras-mc-handler.c	2014-06-26 16:09:30.000000000 -0400
++++ upstream/ras-mc-handler.c	2014-06-26 16:09:32.000000000 -0400
+@@ -120,25 +120,17 @@ if (pevent_get_field_val(s,  event, "mc_
+ 	if (pevent_get_field_val(s,  event, "top_layer", record, &val, 1) < 0)
+ 		goto parse_error;
+ 	parsed_fields++;
++	ev.top_layer = (signed char) val;
+ 
+-	ev.top_layer = (int) val;
+ 	if (pevent_get_field_val(s,  event, "middle_layer", record, &val, 1) < 0)
+ 		goto parse_error;
+ 	parsed_fields++;
++	ev.middle_layer = (signed char) val;
+ 
+-	ev.middle_layer = (int) val;
+ 	if (pevent_get_field_val(s,  event, "lower_layer", record, &val, 1) < 0)
+ 		goto parse_error;
+ 	parsed_fields++;
+-
+-	ev.lower_layer = (int) val;
+-
+-	if (ev.top_layer == 255)
+-		ev.top_layer = -1;
+-	if (ev.middle_layer == 255)
+-		ev.middle_layer = -1;
+-	if (ev.lower_layer == 255)
+-		ev.lower_layer = -1;
++	ev.lower_layer = (signed char) val;
+ 
+ 	if (ev.top_layer >= 0 || ev.middle_layer >= 0 || ev.lower_layer >= 0) {
+ 		if (ev.lower_layer >= 0)

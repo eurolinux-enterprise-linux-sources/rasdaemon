@@ -1,0 +1,52 @@
+From a9810094cf838e03102f95333db7ddfe810ccabd Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 18 May 2015 14:19:32 -0300
+Subject: [PATCH 05/13] rasdaemon: add support for Broadwell
+
+Only basic support for now.
+
+Based on mcelog code.
+
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ ras-mce-handler.c | 3 +++
+ ras-mce-handler.h | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index 07e298f..e059b92 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -49,6 +49,7 @@ static char *cputype_name[] = {
+ 	[CPU_IVY_BRIDGE_EPEX] = "Ivy Bridge EP/EX",	/* Fill in better name */
+ 	[CPU_HASWELL] = "Haswell",
+ 	[CPU_HASWELL_EPEX] = "Intel Xeon v3 (Haswell) EP/EX",
++	[CPU_BROADWELL] = "Broadwell",
+ };
+ 
+ static enum cputype select_intel_cputype(struct ras_events *ras)
+@@ -88,6 +89,8 @@ static enum cputype select_intel_cputype(struct ras_events *ras)
+ 			return CPU_HASWELL;
+ 		else if (mce->model == 0x3f)
+ 			return CPU_HASWELL_EPEX;
++		else if (mce->model == 0x3d)
++			return CPU_BROADWELL;
+ 
+ 		if (mce->model > 0x1a) {
+ 			log(ALL, LOG_INFO,
+diff --git a/ras-mce-handler.h b/ras-mce-handler.h
+index b8b3d4f..ba01f55 100644
+--- a/ras-mce-handler.h
++++ b/ras-mce-handler.h
+@@ -44,6 +44,7 @@ enum cputype {
+ 	CPU_IVY_BRIDGE_EPEX,
+ 	CPU_HASWELL,
+ 	CPU_HASWELL_EPEX,
++	CPU_BROADWELL,
+ };
+ 
+ struct mce_event {
+-- 
+1.8.3.1
+

@@ -1,0 +1,85 @@
+From 2925cc92d73065dab3bbf7de83404d6e0e141dc6 Mon Sep 17 00:00:00 2001
+From: Mauro Carvalho Chehab <mchehab@redhat.com>
+Date: Fri, 31 May 2013 14:57:54 -0300
+Subject: [PATCH 08/32] ras-mc-ctl: add summary for MCE and PCIe AER errors
+
+Report the summary also for MCE and PCIe errors.
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+---
+ util/ras-mc-ctl.in |   50 ++++++++++++++++++++++++++++++++++++++++++++------
+ 1 files changed, 44 insertions(+), 6 deletions(-)
+
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index 5b1ca4d..118af7b 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -824,21 +824,59 @@ sub find_prog
+ sub summary
+ {
+     require DBI;
++    my ($query, $query_handle, $out);
++    my ($err_type, $label, $mc, $top, $mid, $low, $count, $msg);
+ 
+     my $dbh = DBI->connect("dbi:SQLite:dbname=$dbname", "", "", {});
+ 
+-    my $query = "select label, mc, top_layer,middle_layer,lower_layer, count(*) from mc_event group by label,mc,top_layer,middle_layer,lower_layer";
+-    my $query_handle = $dbh->prepare($query);
++    # Memory controller mc_event errors
++    $query = "select err_type, label, mc, top_layer,middle_layer,lower_layer, count(*) from mc_event group by err_type, label, mc, top_layer, middle_layer, lower_layer";
++    $query_handle = $dbh->prepare($query);
+     $query_handle->execute();
++    $query_handle->bind_columns(\($err_type, $label, $mc, $top, $mid, $low, $count));
++    $out = "";
++    while($query_handle->fetch()) {
++        $out .= "\t$err_type on DIMM Label(s): '$label' location: $mc:$top:$mid:$low errors: $count\n";
++    }
++    if ($out ne "") {
++        print "Memory controller events summary:\n$out\n";
++    } else {
++        print "No Memory errors.\n\n";
++    }
++    $query_handle->finish;
+ 
+-    $query_handle->bind_columns(\my($label, $mc, $top, $mid, $low, $count));
+-
+-    print "Memory controller events summary:\n";
++    # PCIe AER aer_event errors
++    $query = "select err_type, err_msg, count(*) from aer_event group by err_type, err_msg";
++    $query_handle = $dbh->prepare($query);
++    $query_handle->execute();
++    $query_handle->bind_columns(\($err_type, $msg, $count));
++    $out = "";
+     while($query_handle->fetch()) {
+-        print "DIMM Label(s): '$label' location: $mc:$top:$mid:$low errors: $count\n";
++        $out .= "\t$count $err_type errors: $msg\n";
+     }
++    if ($out ne "") {
++        print "PCIe AER events summary:\n$out\n";
++    } else {
++        print "No PCIe AER errors.\n\n";
++    }
++    $query_handle->finish;
+ 
++    # MCE mce_record errors
++    $query = "select error_msg, count(*) from mce_record group by error_msg";
++    $query_handle = $dbh->prepare($query);
++    $query_handle->execute();
++    $query_handle->bind_columns(\($msg, $count));
++    $out = "";
++    while($query_handle->fetch()) {
++        $out .= "\t$count $msg errors\n";
++    }
++    if ($out ne "") {
++        print "MCE records summary:\n$out";
++    } else {
++        print "No MCE errors.\n";
++    }
+     $query_handle->finish;
++
+     undef($dbh);
+ }
+ 
+-- 
+1.7.1
+

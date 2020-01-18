@@ -1,0 +1,17 @@
+---
+ misc/rasdaemon.service.in |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+--- upstream.orig/misc/rasdaemon.service.in	2014-06-04 14:25:13.000000000 -0400
++++ upstream/misc/rasdaemon.service.in	2014-07-08 14:37:26.421395520 -0400
+@@ -3,7 +3,9 @@ Description=RAS daemon to log the RAS ev
+ After=syslog.target
+ 
+ [Service]
+-ExecStart=@sbindir@/rasdaemon -f
++ExecStart=@sbindir@/rasdaemon -f -r
++ExecStartPost=@sbindir@/rasdaemon --enable
++ExecStop=@sbindir@/rasdaemon --disable
+ Restart=on-abort
+ 
+ [Install]

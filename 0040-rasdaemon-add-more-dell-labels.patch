@@ -1,0 +1,119 @@
+Hello,
+
+This patch adds labels for these Dell PowerEdge Servers:
+
+R610,R/T710, R220, R/T620, R720/xd, R730/xd, M520, M620 and M820.
+
+The current T610 (0F5XM3) mapping is incorrect. This patch fixes it.
+
+Reqest review and inclusion to git repo.
+
+Acked-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Charles Rose <charles.rose.linux@gmail.com>
+---
+Changes in v2:
+- Include T110 II, T20, R/T320, M420, R/T420, R/T630, FC620, FC420
+- Include additional model numbers for M820 and some 2-socket systems.
+- Consolidate systems with similar maps.
+---
+ labels/dell | 86 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 79 insertions(+), 7 deletions(-)
+
+diff --git a/labels/dell b/labels/dell
+index e1a09a7..d7e797b 100644
+--- a/labels/dell
++++ b/labels/dell
+@@ -9,12 +9,84 @@
+ #
+ 
+ Vendor: Dell Inc.
++#### 11G ####
++# 2-socket
++# PowerEdge R610
++  Model: 0K399H, 0F0XJ6
++    DIMM_A1: 0.0.0;	DIMM_A2:  0.0.1;	DIMM_A3:  0.0.2;
++    DIMM_A4: 0.1.0;	DIMM_A5:  0.1.1;	DIMM_A6:  0.1.2;
+ 
+-  Model: 0F5XM3
+-    DIMM_A1: 0.0.0;	DIMM_A2:  0.0.1;	DIMM_A3:  0.0.2;	DIMM_A4:  0.0.3;
+-    DIMM_A5: 0.1.0;	DIMM_A6:  0.1.1;	DIMM_A7:  0.1.2;	DIMM_A8:  0.1.3;
+-    DIMM_A9: 0.2.0;	DIMM_A10: 0.2.1;	DIMM_A11: 0.2.2;	DIMM_A12: 0.2.3;
++    DIMM_B1: 1.0.0;	DIMM_B2:  1.0.1;	DIMM_B3:  1.0.2;
++    DIMM_B4: 1.1.0;	DIMM_B5:  1.1.1;	DIMM_B6:  1.1.2;
+ 
+-    DIMM_B1: 1.0.0;	DIMM_B2:  1.0.1;	DIMM_B3:  1.0.2;	DIMM_B4:  1.0.3;
+-    DIMM_B5: 1.1.0;	DIMM_B6:  1.1.1;	DIMM_B7:  1.1.2;	DIMM_B8:  1.1.3;
+-    DIMM_B9: 1.2.0;	DIMM_B10: 1.2.1;	DIMM_B11: 1.2.2;	DIMM_B12: 1.2.3;
++# PowerEdge T710	R710
++  Model: 01CTXG,	0N0H4P, 0MD99X, 0N047H, 0PV9DG
++    DIMM_A3: 0.0.0;	DIMM_A2:  0.1.0;	DIMM_A1:  0.2.0;
++    DIMM_A6: 0.0.1;	DIMM_A5:  0.1.1;	DIMM_A4:  0.2.1;
++    DIMM_A9: 0.0.2;	DIMM_A8:  0.1.2;	DIMM_A7:  0.2.2;
++
++    DIMM_B3: 1.0.0;	DIMM_B2:  1.1.0;	DIMM_B1:  1.2.0;
++    DIMM_B6: 1.0.1;	DIMM_B5:  1.1.1;	DIMM_B4:  1.2.1;
++    DIMM_B9: 1.0.2;	DIMM_B8:  1.1.2;	DIMM_B7:  1.2.2;
++
++#### 12/13G ####
++# 1-socket
++# PowerEdge R220
++  Model: 081N4V
++    DIMM_A1: 0.0.0;    DIMM_A2: 0.0.1;
++    DIMM_A3: 0.1.0;    DIMM_A4: 0.1.1;
++
++#PowerEdge T110 II, T20
++  Model: 0PC2WT, 0PM2CW, 015TH9,  0MDHN4, 0VD5HY
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;
++
++    DIMM_B1:  0.0.1;    DIMM_B2:   0.1.1;
++
++#PowerEdge R320 T320
++  Model: 0YCV59, 0Y97HY, 07DKYR, 0VJ84C,  07MYHN, 04DMNN, 0W7H8C, 0K20G5, 0V719V, 0FDT3J
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;
++    DIMM_A4:  0.0.1;    DIMM_A5:   0.1.1;       DIMM_A6:   0.2.1;
++
++# 2-socket
++# PowerEdge R620/T620			R720/xd					R730/xd		T630	R730		R630	T620	M620, FC620
++  Model: 0VWT90, 07NDJ2, 0F5XM3,	0PXXHP, 0X3D66, 061P35, 0H5J4J, 00W9X3,	0599V5,		0W9WXC, 0599V5, 0H21J3, 0CNCJW,  02CD1V, 0T5TFW, 0F5XM3, 0G1CNH,  05YV77, 0PDCCX, 093MW8, 0NJVT7
++    DIMM_A1:  0.0.0;	DIMM_A2:   0.1.0;	DIMM_A3:   0.2.0;	DIMM_A4:   0.3.0;
++    DIMM_A5:  0.0.1;	DIMM_A6:   0.1.1;	DIMM_A7:   0.2.1;	DIMM_A8:   0.3.1;
++    DIMM_A9:  0.0.2;	DIMM_A10:  0.1.2;	DIMM_A11:  0.2.2;	DIMM_A12:  0.3.2;
++
++    DIMM_B1:  1.0.0;	DIMM_B2:   1.1.0;	DIMM_B3:   1.2.0;	DIMM_B4:   1.3.0;
++    DIMM_B5:  1.0.1;	DIMM_B6:   1.1.1;	DIMM_B7:   1.2.1;	DIMM_B8:   1.3.1;
++    DIMM_B9:  1.0.2;	DIMM_B10:  1.1.2;	DIMM_B11:  1.2.2;	DIMM_B12:  1.3.2;
++
++# PowerEdge M520		R420								   T420
++  Model: 0NRG83, 0DW6GX,	03WPHJ, 06HTRX, 0H1Y24, 02T9N6,  0TT5P2, 0CPKXG, 03015M, 061VPC,   0PC9H0, 0K3G34, 0PC0V5, 08NVYK
++    DIMM_A1:  0.0.0;	DIMM_A2:   0.1.0;	DIMM_A3:   0.2.0;
++    DIMM_A4:  0.0.1;	DIMM_A5:   0.1.1;	DIMM_A6:   0.2.1;
++
++    DIMM_B1:  1.0.0;	DIMM_B2:   1.1.0;	DIMM_B3:   1.2.0;
++    DIMM_B4:  1.0.1;	DIMM_B5:   1.1.1;	DIMM_B6:   1.2.1;
++
++#PowerEdge FC420, M420
++  Model: 0DPJGD, 068CTP, 0MN3VC, 0417VP
++     DIMM_A1:  0.0.0;   DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;
++
++     DIMM_B1:  1.0.0;   DIMM_B2:   1.1.0;       DIMM_B3:   1.2.0;
++
++# 4-socket
++# # PowerEdge M820
++  Model: 0RN9TC, 0YWR73, 066N7P, 0PFG1N, 0JC2W3
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;       DIMM_A4:   0.3.0;
++    DIMM_A5:  0.0.1;    DIMM_A6:   0.1.1;       DIMM_A7:   0.2.1;       DIMM_A8:   0.3.1;
++    DIMM_A9:  0.0.2;    DIMM_A10:  0.1.2;       DIMM_A11:  0.2.2;       DIMM_A12:  0.3.2;
++
++    DIMM_B1:  1.0.0;    DIMM_B2:   1.1.0;       DIMM_B3:   1.2.0;       DIMM_B4:   1.3.0;
++    DIMM_B5:  1.0.1;    DIMM_B6:   1.1.1;       DIMM_B7:   1.2.1;       DIMM_B8:   1.3.1;
++    DIMM_B9:  1.0.2;    DIMM_B10:  1.1.2;       DIMM_B11:  1.2.2;       DIMM_B12:  1.3.2;
++
++    DIMM_C1:  2.0.0;    DIMM_C2:   2.1.0;       DIMM_C3:   2.2.0;       DIMM_C4:   2.3.0;
++    DIMM_C5:  2.0.1;    DIMM_C6:   2.1.1;       DIMM_C7:   2.2.1;       DIMM_C8:   2.3.1;
++    DIMM_C9:  2.0.2;    DIMM_C10:  2.1.2;       DIMM_C11:  2.2.2;       DIMM_C12:  2.3.2;
++
++    DIMM_D1:  3.0.0;    DIMM_D2:   3.1.0;       DIMM_D3:   3.2.0;       DIMM_D4:   3.3.0;
++    DIMM_D5:  3.0.1;    DIMM_D6:   3.1.1;       DIMM_D7:   3.2.1;       DIMM_D8:   3.3.1;
++    DIMM_D9:  3.0.2;    DIMM_D10:  3.1.2;       DIMM_D11:  3.2.2;       DIMM_D12:  3.3.2;
+-- 
+1.9.3

@@ -1,0 +1,807 @@
+commit 38d48ed48f9d0baa20786d98abe2b4085fca7d5d
+Author: Luck, Tony <tony.luck@intel.com>
+Date:   Mon Aug 4 13:29:01 2014 -0700
+
+    rasdaemon: Add support for extlog trace events
+    
+    Linux kernel 3.17 includes a new trace event to pick up extended
+    error logs produced by BIOS in the Common Platform Error Record
+    format described in appendix N of the UEFI standard. This patch
+    adds support to collect that information and log it both in
+    readable ASCII and into the sqlite3 database that rasdaemon
+    uses to store all error information.  In addition ras-mc-ctl
+    is updated to query that database for both detailed and summary
+    reports.
+    
+    Big thanks to Aristeu for pretty much all the sqlite3 pieces,
+    plus testing and fixing miscellaneous issues elsewhere.
+    
+    Signed-off-by: Tony Luck <tony.luck@intel.com>
+    Signed-off-by: Mauro Carvalho Chehab <m.chehab@samsung.com>
+
+diff --git a/Makefile.am b/Makefile.am
+index 0fa615f..117c970 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -30,13 +30,17 @@ if WITH_MCE
+ 			mce-intel-dunnington.c mce-intel-tulsa.c \
+ 			mce-intel-sb.c mce-intel-ivb.c
+ endif
++if WITH_EXTLOG
++   rasdaemon_SOURCES += ras-extlog-handler.c
++endif
+ if WITH_ABRT_REPORT
+    rasdaemon_SOURCES += ras-report.c
+ endif
+ rasdaemon_LDADD = -lpthread $(SQLITE3_LIBS) libtrace/libtrace.a
+ 
+ include_HEADERS = config.h  ras-events.h  ras-logger.h  ras-mc-handler.h \
+-		  ras-aer-handler.h ras-mce-handler.h ras-record.h bitfield.h ras-report.h
++		  ras-aer-handler.h ras-mce-handler.h ras-record.h bitfield.h ras-report.h \
++		  ras-extlog-handler.h
+ 
+ # This rule can't be called with more than one Makefile job (like make -j8)
+ # I can't figure out a way to fix that
+diff --git a/configure.ac b/configure.ac
+index 64a5b13..9495491 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -53,6 +53,15 @@ AS_IF([test "x$enable_mce" = "xyes"], [
+ ])
+ AM_CONDITIONAL([WITH_MCE], [test x$enable_mce = xyes])
+ 
++AC_ARG_ENABLE([extlog],
++    AS_HELP_STRING([--enable-extlog], [enable EXTLOG events (currently experimental)]))
++
++AS_IF([test "x$enable_extlog" = "xyes"], [
++  AC_DEFINE(HAVE_EXTLOG,1,"have EXTLOG events collect")
++  AC_SUBST([WITH_EXTLOG])
++])
++AM_CONDITIONAL([WITH_EXTLOG], [test x$enable_extlog = xyes])
++
+ AC_ARG_ENABLE([abrt_report],
+     AS_HELP_STRING([--enable-abrt-report], [enable report event to ABRT (currently experimental)]))
+ 
+diff --git a/ras-aer-handler.c b/ras-aer-handler.c
+index 50526af..bb7c0b9 100644
+--- a/ras-aer-handler.c
++++ b/ras-aer-handler.c
+@@ -70,7 +70,7 @@ int ras_aer_event_handler(struct trace_seq *s,
+ 	 */
+ 
+ 	if (ras->use_uptime)
+-		now = record->ts/1000000000L + ras->uptime_diff;
++		now = record->ts/user_hz + ras->uptime_diff;
+ 	else
+ 		now = time(NULL);
+ 
+diff --git a/ras-events.c b/ras-events.c
+index ecbbd3a..0be7c3f 100644
+--- a/ras-events.c
++++ b/ras-events.c
+@@ -30,6 +30,7 @@
+ #include "ras-mc-handler.h"
+ #include "ras-aer-handler.h"
+ #include "ras-mce-handler.h"
++#include "ras-extlog-handler.h"
+ #include "ras-record.h"
+ #include "ras-logger.h"
+ 
+@@ -203,6 +204,10 @@ int toggle_ras_mc_event(int enable)
+ 	rc |= __toggle_ras_mc_event(ras, "mce", "mce_record", enable);
+ #endif
+ 
++#ifdef HAVE_EXTLOG
++	rc |= __toggle_ras_mc_event(ras, "ras", "extlog_mem_event", enable);
++#endif
++
+ free_ras:
+ 	free(ras);
+ 	return rc;
+@@ -688,6 +693,19 @@ int handle_ras_events(int record_events)
+ 		    "mce", "mce_record");
+ 	}
+ #endif
++
++#ifdef HAVE_EXTLOG
++	rc = add_event_handler(ras, pevent, page_size, "ras", "extlog_mem_event",
++			       ras_extlog_mem_event_handler);
++	if (!rc) {
++		/* tell kernel we are listening, so don't printk to console */
++		(void)open("/sys/kernel/debug/ras/daemon_active", 0);
++		num_events++;
++	} else
++		log(ALL, LOG_ERR, "Can't get traces from %s:%s\n",
++		    "ras", "aer_event");
++#endif
++
+ 	if (!num_events) {
+ 		log(ALL, LOG_INFO,
+ 		    "Failed to trace all supported RAS events. Aborting.\n");
+diff --git a/ras-extlog-handler.c b/ras-extlog-handler.c
+new file mode 100644
+index 0000000..5fd3580
+--- /dev/null
++++ b/ras-extlog-handler.c
+@@ -0,0 +1,246 @@
++/*
++ * Copyright (C) 2014 Tony Luck <tony.luck@intel.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++*/
++#include <ctype.h>
++#include <errno.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include <stdint.h>
++#include "libtrace/kbuffer.h"
++#include "ras-extlog-handler.h"
++#include "ras-record.h"
++#include "ras-logger.h"
++#include "ras-report.h"
++
++static char *err_type(int etype)
++{
++	switch (etype) {
++	case 0: return "unknown";
++	case 1: return "no error";
++	case 2: return "single-bit ECC";
++	case 3: return "multi-bit ECC";
++	case 4: return "single-symbol chipkill ECC";
++	case 5: return "multi-symbol chipkill ECC";
++	case 6: return "master abort";
++	case 7: return "target abort";
++	case 8: return "parity error";
++	case 9: return "watchdog timeout";
++	case 10: return "invalid address";
++	case 11: return "mirror Broken";
++	case 12: return "memory sparing";
++	case 13: return "scrub corrected error";
++	case 14: return "scrub uncorrected error";
++	case 15: return "physical memory map-out event";
++	}
++	return "unknown-type";
++}
++
++static char *err_severity(int severity)
++{
++	switch (severity) {
++	case 0: return "recoverable";
++	case 1: return "fatal";
++	case 2: return "corrected";
++	case 3: return "informational";
++	}
++	return "unknown-severity";
++}
++
++static unsigned long long err_mask(int lsb)
++{
++	if (lsb == 0xff)
++		return ~0ull;
++	return ~((1ull << lsb) - 1);
++}
++
++#define CPER_MEM_VALID_NODE			0x0008
++#define CPER_MEM_VALID_CARD			0x0010
++#define CPER_MEM_VALID_MODULE			0x0020
++#define CPER_MEM_VALID_BANK			0x0040
++#define CPER_MEM_VALID_DEVICE			0x0080
++#define CPER_MEM_VALID_ROW			0x0100
++#define CPER_MEM_VALID_COLUMN			0x0200
++#define CPER_MEM_VALID_BIT_POSITION		0x0400
++#define CPER_MEM_VALID_REQUESTOR_ID		0x0800
++#define CPER_MEM_VALID_RESPONDER_ID		0x1000
++#define CPER_MEM_VALID_TARGET_ID		0x2000
++#define CPER_MEM_VALID_RANK_NUMBER		0x8000
++#define CPER_MEM_VALID_CARD_HANDLE		0x10000
++#define CPER_MEM_VALID_MODULE_HANDLE		0x20000
++
++struct cper_mem_err_compact {
++	unsigned long long	validation_bits;
++	unsigned short		node;
++	unsigned short		card;
++	unsigned short		module;
++	unsigned short		bank;
++	unsigned short		device;
++	unsigned short		row;
++	unsigned short		column;
++	unsigned short		bit_pos;
++	unsigned long long	requestor_id;
++	unsigned long long	responder_id;
++	unsigned long long	target_id;
++	unsigned short		rank;
++	unsigned short		mem_array_handle;
++	unsigned short		mem_dev_handle;
++};
++
++static char *err_cper_data(const char *c)
++{
++	const struct cper_mem_err_compact *cpd = (struct cper_mem_err_compact *)c;
++	static char buf[256];
++	char *p = buf;
++
++	if (cpd->validation_bits == 0)
++		return "";
++	p += sprintf(p, " (");
++	if (cpd->validation_bits & CPER_MEM_VALID_NODE)
++		p += sprintf(p, "node: %d ", cpd->node);
++	if (cpd->validation_bits & CPER_MEM_VALID_CARD)
++		p += sprintf(p, "card: %d ", cpd->card);
++	if (cpd->validation_bits & CPER_MEM_VALID_MODULE)
++		p += sprintf(p, "module: %d ", cpd->module);
++	if (cpd->validation_bits & CPER_MEM_VALID_BANK)
++		p += sprintf(p, "bank: %d ", cpd->bank);
++	if (cpd->validation_bits & CPER_MEM_VALID_DEVICE)
++		p += sprintf(p, "device: %d ", cpd->device);
++	if (cpd->validation_bits & CPER_MEM_VALID_ROW)
++		p += sprintf(p, "row: %d ", cpd->row);
++	if (cpd->validation_bits & CPER_MEM_VALID_COLUMN)
++		p += sprintf(p, "column: %d ", cpd->column);
++	if (cpd->validation_bits & CPER_MEM_VALID_BIT_POSITION)
++		p += sprintf(p, "bit_pos: %d ", cpd->bit_pos);
++	if (cpd->validation_bits & CPER_MEM_VALID_REQUESTOR_ID)
++		p += sprintf(p, "req_id: 0x%llx ", cpd->requestor_id);
++	if (cpd->validation_bits & CPER_MEM_VALID_RESPONDER_ID)
++		p += sprintf(p, "resp_id: 0x%llx ", cpd->responder_id);
++	if (cpd->validation_bits & CPER_MEM_VALID_TARGET_ID)
++		p += sprintf(p, "tgt_id: 0x%llx ", cpd->target_id);
++	if (cpd->validation_bits & CPER_MEM_VALID_RANK_NUMBER)
++		p += sprintf(p, "rank: %d ", cpd->rank);
++	if (cpd->validation_bits & CPER_MEM_VALID_CARD_HANDLE)
++		p += sprintf(p, "card_handle: %d ", cpd->mem_array_handle);
++	if (cpd->validation_bits & CPER_MEM_VALID_MODULE_HANDLE)
++		p += sprintf(p, "module_handle: %d ", cpd->mem_dev_handle);
++	p += sprintf(p-1, ")");
++
++	return buf;
++}
++
++static char *uuid_le(const char *uu)
++{
++	static char uuid[sizeof("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")];
++	char *p = uuid;
++	int i;
++	static const unsigned char le[16] = {3,2,1,0,5,4,7,6,8,9,10,11,12,13,14,15};
++
++	for (i = 0; i < 16; i++) {
++		p += sprintf(p, "%.2x", uu[le[i]]);
++		switch (i) {
++		case 3:
++		case 5:
++		case 7:
++		case 9:
++			*p++ = '-';
++			break;
++		}
++	}
++
++	*p = 0;
++
++	return uuid;
++}
++
++
++static void report_extlog_mem_event(struct ras_events *ras,
++				    struct pevent_record *record,
++				    struct trace_seq *s,
++				    struct ras_extlog_event *ev)
++{
++	trace_seq_printf(s, "%d %s error: %s physical addr: 0x%llx mask: 0x%llx%s %s %s",
++		ev->error_seq, err_severity(ev->severity),
++		err_type(ev->etype), ev->address,
++		err_mask(ev->pa_mask_lsb),
++		err_cper_data(ev->cper_data),
++		ev->fru_text,
++		uuid_le(ev->fru_id));
++}
++
++int ras_extlog_mem_event_handler(struct trace_seq *s,
++			  struct pevent_record *record,
++			  struct event_format *event, void *context)
++{
++	int len;
++	unsigned long long val;
++	struct ras_events *ras = context;
++	time_t now;
++	struct tm *tm;
++	struct ras_extlog_event ev;
++
++	/*
++	 * Newer kernels (3.10-rc1 or upper) provide an uptime clock.
++	 * On previous kernels, the way to properly generate an event would
++	 * be to inject a fake one, measure its timestamp and diff it against
++	 * gettimeofday. We won't do it here. Instead, let's use uptime,
++	 * falling-back to the event report's time, if "uptime" clock is
++	 * not available (legacy kernels).
++	 */
++
++	if (ras->use_uptime)
++		now = record->ts/user_hz + ras->uptime_diff;
++	else
++		now = time(NULL);
++
++	tm = localtime(&now);
++	if (tm)
++		strftime(ev.timestamp, sizeof(ev.timestamp),
++			 "%Y-%m-%d %H:%M:%S %z", tm);
++	trace_seq_printf(s, "%s ", ev.timestamp);
++
++	if (pevent_get_field_val(s,  event, "etype", record, &val, 1) < 0)
++		return -1;
++	ev.etype = val;
++	if (pevent_get_field_val(s,  event, "err_seq", record, &val, 1) < 0)
++		return -1;
++	ev.error_seq = val;
++	if (pevent_get_field_val(s,  event, "sev", record, &val, 1) < 0)
++		return -1;
++	ev.severity = val;
++	if (pevent_get_field_val(s,  event, "pa", record, &val, 1) < 0)
++		return -1;
++	ev.address = val;
++	if (pevent_get_field_val(s,  event, "pa_mask_lsb", record, &val, 1) < 0)
++		return -1;
++	ev.pa_mask_lsb = val;
++
++	ev.cper_data = pevent_get_field_raw(s, event, "data",
++					   record, &len, 1);
++	ev.cper_data_length = len;
++	ev.fru_text = pevent_get_field_raw(s, event, "fru_text",
++					   record, &len, 1);
++	ev.fru_id = pevent_get_field_raw(s, event, "fru_id",
++					   record, &len, 1);
++
++	report_extlog_mem_event(ras, record, s, &ev);
++
++	ras_store_extlog_mem_record(ras, &ev);
++
++	return 0;
++}
+diff --git a/ras-extlog-handler.h b/ras-extlog-handler.h
+new file mode 100644
+index 0000000..54e8cec
+--- /dev/null
++++ b/ras-extlog-handler.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (C) 2014 Tony Luck <tony.luck@intel.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++*/
++
++#ifndef __RAS_EXTLOG_HANDLER_H
++#define __RAS_EXTLOG_HANDLER_H
++
++#include <stdint.h>
++
++#include "ras-events.h"
++#include "libtrace/event-parse.h"
++
++extern int ras_extlog_mem_event_handler(struct trace_seq *s,
++			  struct pevent_record *record,
++			  struct event_format *event, void *context);
++
++#endif
+diff --git a/ras-mc-handler.c b/ras-mc-handler.c
+index ffb3805..704a41c 100644
+--- a/ras-mc-handler.c
++++ b/ras-mc-handler.c
+@@ -47,7 +47,7 @@ int ras_mc_event_handler(struct trace_seq *s,
+ 	 */
+ 
+ 	if (ras->use_uptime)
+-		now = record->ts/1000000000L + ras->uptime_diff;
++		now = record->ts/user_hz + ras->uptime_diff;
+ 	else
+ 		now = time(NULL);
+ 
+diff --git a/ras-mce-handler.c b/ras-mce-handler.c
+index 1431049..a1d0b5d 100644
+--- a/ras-mce-handler.c
++++ b/ras-mce-handler.c
+@@ -237,7 +237,7 @@ static void report_mce_event(struct ras_events *ras,
+ 	 */
+ 
+ 	if (ras->use_uptime)
+-		now = record->ts/1000000000L + ras->uptime_diff;
++		now = record->ts/user_hz + ras->uptime_diff;
+ 	else
+ 		now = time(NULL);
+ 
+diff --git a/ras-record.c b/ras-record.c
+index e5150ad..3dc4493 100644
+--- a/ras-record.c
++++ b/ras-record.c
+@@ -157,6 +157,57 @@ int ras_store_aer_event(struct ras_events *ras, struct ras_aer_event *ev)
+ }
+ #endif
+ 
++#ifdef HAVE_EXTLOG
++static const struct db_fields extlog_event_fields[] = {
++		{ .name="id",			.type="INTEGER PRIMARY KEY" },
++		{ .name="timestamp",		.type="TEXT" },
++		{ .name="etype",		.type="INTEGER" },
++		{ .name="error_count",		.type="INTEGER" },
++		{ .name="severity",		.type="INTEGER" },
++		{ .name="address",		.type="INTEGER" },
++		{ .name="fru_id",		.type="BLOB" },
++		{ .name="fru_text",		.type="TEXT" },
++		{ .name="cper_data",		.type="BLOB" },
++};
++
++static const struct db_table_descriptor extlog_event_tab = {
++	.name = "extlog_event",
++	.fields = extlog_event_fields,
++	.num_fields = ARRAY_SIZE(extlog_event_fields),
++};
++
++int ras_store_extlog_mem_record(struct ras_events *ras, struct ras_extlog_event *ev)
++{
++	int rc;
++	struct sqlite3_priv *priv = ras->db_priv;
++
++	if (!priv || !priv->stmt_extlog_record)
++		return 0;
++	log(TERM, LOG_INFO, "extlog_record store: %p\n", priv->stmt_extlog_record);
++
++	sqlite3_bind_text  (priv->stmt_extlog_record,  1, ev->timestamp, -1, NULL);
++	sqlite3_bind_int   (priv->stmt_extlog_record,  2, ev->etype);
++	sqlite3_bind_int   (priv->stmt_extlog_record,  3, ev->error_seq);
++	sqlite3_bind_int   (priv->stmt_extlog_record,  4, ev->severity);
++	sqlite3_bind_int64 (priv->stmt_extlog_record,  5, ev->address);
++	sqlite3_bind_blob  (priv->stmt_extlog_record,  6, ev->fru_id, 16, NULL);
++	sqlite3_bind_text  (priv->stmt_extlog_record,  7, ev->fru_text, -1, NULL);
++	sqlite3_bind_blob  (priv->stmt_extlog_record,  8, ev->cper_data, ev->cper_data_length, NULL);
++
++	rc = sqlite3_step(priv->stmt_extlog_record);
++	if (rc != SQLITE_OK && rc != SQLITE_DONE)
++		log(TERM, LOG_ERR,
++		    "Failed to do extlog_mem_record step on sqlite: error = %d\n", rc);
++	rc = sqlite3_reset(priv->stmt_extlog_record);
++	if (rc != SQLITE_OK && rc != SQLITE_DONE)
++		log(TERM, LOG_ERR,
++		    "Failed reset extlog_mem_record on sqlite: error = %d\n",
++		    rc);
++	log(TERM, LOG_INFO, "register inserted at db\n");
++
++	return rc;
++}
++#endif
+ 
+ /*
+  * Table and functions to handle mce:mce_record
+@@ -385,6 +436,13 @@ int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras)
+ 					 &aer_event_tab);
+ #endif
+ 
++#ifdef HAVE_EXTLOG
++	rc = ras_mc_create_table(priv, &extlog_event_tab);
++	if (rc == SQLITE_OK)
++		rc = ras_mc_prepare_stmt(priv, &priv->stmt_extlog_record,
++					 &extlog_event_tab);
++#endif
++
+ #ifdef HAVE_MCE
+ 	rc = ras_mc_create_table(priv, &mce_record_tab);
+ 	if (rc == SQLITE_OK)
+diff --git a/ras-record.h b/ras-record.h
+index 6f146a8..5d84297 100644
+--- a/ras-record.h
++++ b/ras-record.h
+@@ -19,8 +19,11 @@
+ #ifndef __RAS_RECORD_H
+ #define __RAS_RECORD_H
+ 
++#include <stdint.h>
+ #include "config.h"
+ 
++extern long user_hz;
++
+ struct ras_events *ras;
+ 
+ struct ras_mc_event {
+@@ -40,8 +43,22 @@ struct ras_aer_event {
+ 	const char *msg;
+ };
+ 
++struct ras_extlog_event {
++	char timestamp[64];
++	int32_t error_seq;
++	int8_t etype;
++	int8_t severity;
++	unsigned long long address;
++	int8_t pa_mask_lsb;
++	const char *fru_id;
++	const char *fru_text;
++	const char *cper_data;
++	unsigned short cper_data_length;
++};
++
+ struct ras_mc_event;
+ struct ras_aer_event;
++struct ras_extlog_event;
+ struct mce_event;
+ 
+ #ifdef HAVE_SQLITE3
+@@ -57,18 +74,23 @@ struct sqlite3_priv {
+ #ifdef HAVE_MCE
+ 	sqlite3_stmt	*stmt_mce_record;
+ #endif
++#ifdef HAVE_EXTLOG
++	sqlite3_stmt	*stmt_extlog_record;
++#endif
+ };
+ 
+ int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras);
+ int ras_store_mc_event(struct ras_events *ras, struct ras_mc_event *ev);
+ int ras_store_aer_event(struct ras_events *ras, struct ras_aer_event *ev);
+ int ras_store_mce_record(struct ras_events *ras, struct mce_event *ev);
++int ras_store_extlog_mem_record(struct ras_events *ras, struct ras_extlog_event *ev);
+ 
+ #else
+ static inline int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras) { return 0; };
+ static inline int ras_store_mc_event(struct ras_events *ras, struct ras_mc_event *ev) { return 0; };
+ static inline int ras_store_aer_event(struct ras_events *ras, struct ras_aer_event *ev) { return 0; };
+ static inline int ras_store_mce_record(struct ras_events *ras, struct mce_event *ev) { return 0; };
++static inline int ras_store_extlog_mem_record(struct ras_events *ras, struct ras_extlog_event *ev) { return 0; };
+ 
+ #endif
+ 
+diff --git a/rasdaemon.c b/rasdaemon.c
+index 85ac2d4..41022ef 100644
+--- a/rasdaemon.c
++++ b/rasdaemon.c
+@@ -68,6 +68,8 @@ static error_t parse_opt(int k, char *arg, struct argp_state *state)
+ 	return 0;
+ }
+ 
++long user_hz;
++
+ int main(int argc, char *argv[])
+ {
+ 	struct arguments args;
+@@ -91,6 +93,8 @@ int main(int argc, char *argv[])
+ 	};
+ 	memset (&args, 0, sizeof(args));
+ 
++	user_hz = sysconf(_SC_CLK_TCK);
++
+ 	argp_parse(&argp, argc, argv, 0,  &idx, &args);
+ 
+ 	if (idx < 0) {
+diff --git a/util/ras-mc-ctl.in b/util/ras-mc-ctl.in
+index e9f9c59..110262f 100755
+--- a/util/ras-mc-ctl.in
++++ b/util/ras-mc-ctl.in
+@@ -842,11 +842,141 @@ sub find_prog
+     return "";
+ }
+ 
++sub get_extlog_type
++{
++    my @types;
++
++    if ($_[0] < 0 || $_[0] > 15) {
++        return "unknown-type";
++    }
++
++    @types = ("unknown",
++              "no error",
++              "single-bit ECC",
++              "multi-bit ECC",
++              "single-symbol chipkill ECC",
++              "multi-symbol chipkill ECC",
++              "master abort",
++              "target abort",
++              "parity error",
++              "watchdog timeout",
++              "invalid address",
++              "mirror Broken",
++              "memory sparing",
++              "scrub corrected error",
++              "scrub uncorrected error",
++              "physical memory map-out event",
++              "unknown-type");
++    return $types[$_[0]];
++}
++
++sub get_extlog_severity
++{
++    my @sev;
++
++    if ($_[0] < 0 || $_[0] > 3) {
++        return "unknown-severity";
++    }
++
++    @sev = ("recoverable",
++            "fatal",
++            "corrected",
++            "informational",
++            "unknown-severity");
++    return $sev[$_[0]];
++}
++
++use constant {
++    CPER_MEM_VALID_NODE => 0x0008,
++    CPER_MEM_VALID_CARD => 0x0010,
++    CPER_MEM_VALID_MODULE => 0x0020,
++    CPER_MEM_VALID_BANK => 0x0040,
++    CPER_MEM_VALID_DEVICE => 0x0080,
++    CPER_MEM_VALID_ROW => 0x0100,
++    CPER_MEM_VALID_COLUMN => 0x0200,
++    CPER_MEM_VALID_BIT_POSITION => 0x0400,
++    CPER_MEM_VALID_REQUESTOR_ID => 0x0800,
++    CPER_MEM_VALID_RESPONDER_ID => 0x1000,
++    CPER_MEM_VALID_TARGET_ID => 0x2000,
++    CPER_MEM_VALID_ERROR_TYPE => 0x4000,
++    CPER_MEM_VALID_RANK_NUMBER => 0x8000,
++    CPER_MEM_VALID_CARD_HANDLE => 0x10000,
++    CPER_MEM_VALID_MODULE_HANDLE => 0x20000,
++};
++
++sub get_cper_data_text
++{
++    my $cper_data = $_[0];
++    my ($validation_bits, $node, $card, $module, $bank, $device, $row, $column, $bit_pos, $requestor_id, $responder_id, $target_id, $rank, $mem_array_handle, $mem_dev_handle) = unpack 'QSSSSSSSSQQQSSS', $cper_data;
++    my @out;
++
++    if ($validation_bits & CPER_MEM_VALID_NODE) {
++        push @out, (sprintf "node=%d", $node);
++    }
++    if ($validation_bits & CPER_MEM_VALID_CARD) {
++        push @out, (sprintf "card=%d", $card);
++    }
++    if ($validation_bits & CPER_MEM_VALID_MODULE) {
++        push @out, (sprintf "module=%d", $module);
++    }
++    if ($validation_bits & CPER_MEM_VALID_BANK) {
++        push @out, (sprintf "bank=%d", $bank);
++    }
++    if ($validation_bits & CPER_MEM_VALID_DEVICE) {
++        push @out, (sprintf "device=%d", $device);
++    }
++    if ($validation_bits & CPER_MEM_VALID_ROW) {
++        push @out, (sprintf "row=%d", $row);
++    }
++    if ($validation_bits & CPER_MEM_VALID_COLUMN) {
++        push @out, (sprintf "column=%d", $column);
++    }
++    if ($validation_bits & CPER_MEM_VALID_BIT_POSITION) {
++        push @out, (sprintf "bit_position=%d", $bit_pos);
++    }
++    if ($validation_bits & CPER_MEM_VALID_REQUESTOR_ID) {
++        push @out, (sprintf "0x%08x", $requestor_id);
++    }
++    if ($validation_bits & CPER_MEM_VALID_RESPONDER_ID) {
++        push @out, (sprintf "0x%08x", $responder_id);
++    }
++    if ($validation_bits & CPER_MEM_VALID_TARGET_ID) {
++        push @out, (sprintf "0x%08x", $target_id);
++    }
++    if ($validation_bits & CPER_MEM_VALID_RANK_NUMBER) {
++        push @out, (sprintf "rank=%d", $rank);
++    }
++    if ($validation_bits & CPER_MEM_VALID_CARD_HANDLE) {
++        push @out, (sprintf "mem_array_handle=%d", $mem_array_handle);
++    }
++    if ($validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
++        push @out, (sprintf "mem_dev_handle=%d", $mem_dev_handle);
++    }
++
++    return join (", ", @out);
++}
++
++sub get_uuid_le
++{
++    my $out = "";
++    my @bytes = unpack "C*", $_[0];
++    my @le16_table = (3, 2, 1, 0, 5, 4, 7, 6, 8, 9, 10, 11, 12, 13, 14, 15);
++
++    for (my $i = 0; $i < 16; $i++) {
++        $out .= sprintf "%.2x", $bytes[$le16_table[$i]];
++        if ($i == 3 or $i == 5 or $i == 7 or $i == 9) {
++            $out .= "-";
++        }
++    }
++    return $out;
++}
++
+ sub summary
+ {
+     require DBI;
+     my ($query, $query_handle, $out);
+     my ($err_type, $label, $mc, $top, $mid, $low, $count, $msg);
++    my ($etype, $severity, $etype_string, $severity_string);
+ 
+     my $dbh = DBI->connect("dbi:SQLite:dbname=$dbname", "", "", {});
+ 
+@@ -882,6 +1012,24 @@ sub summary
+     }
+     $query_handle->finish;
+ 
++    # extlog errors
++    $query = "select etype, severity, count(*) from extlog_event group by etype, severity";
++    $query_handle = $dbh->prepare($query);
++    $query_handle->execute();
++    $query_handle->bind_columns(\($etype, $severity, $count));
++    $out = "";
++    while($query_handle->fetch()) {
++        $etype_string = get_extlog_type($etype);
++        $severity_string = get_extlog_severity($severity);
++        $out .= "\t$count $etype_string $severity_string errors\n";
++    }
++    if ($out ne "") {
++        print "Extlog records summary:\n$out";
++    } else {
++        print "No Extlog errors.\n";
++    }
++    $query_handle->finish;
++
+     # MCE mce_record errors
+     $query = "select error_msg, count(*) from mce_record group by error_msg";
+     $query_handle = $dbh->prepare($query);
+@@ -906,6 +1054,7 @@ sub errors
+     require DBI;
+     my ($query, $query_handle, $id, $time, $count, $type, $msg, $label, $mc, $top, $mid, $low, $addr, $grain, $syndrome, $detail, $out);
+     my ($mcgcap,$mcgstatus, $status, $misc, $ip, $tsc, $walltime, $cpu, $cpuid, $apicid, $socketid, $cs, $bank, $cpuvendor, $bank_name, $mcgstatus_msg, $mcistatus_msg, $user_action, $mc_location);
++    my ($timestamp, $etype, $severity, $etype_string, $severity_string, $fru_id, $fru_text, $cper_data);
+ 
+     my $dbh = DBI->connect("dbi:SQLite:dbname=$dbname", "", "", {});
+ 
+@@ -945,6 +1094,31 @@ sub errors
+     }
+     $query_handle->finish;
+ 
++    # Extlog errors
++    $query = "select id, timestamp, etype, severity, address, fru_id, fru_text, cper_data from extlog_event order by id";
++    $query_handle = $dbh->prepare($query);
++    $query_handle->execute();
++    $query_handle->bind_columns(\($id, $timestamp, $etype, $severity, $addr, $fru_id, $fru_text, $cper_data));
++    $out = "";
++    while($query_handle->fetch()) {
++        $etype_string = get_extlog_type($etype);
++        $severity_string = get_extlog_severity($severity);
++        $out .= "$id $timestamp error: ";
++        $out .= "type=$etype_string, ";
++        $out .= "severity=$severity_string, ";
++        $out .= sprintf "address=0x%08x, ", $addr;
++        $out .= sprintf "fru_id=%s, ", get_uuid_le($fru_id);
++        $out .= "fru_text='$fru_text', ";
++        $out .= get_cper_data_text($cper_data) if ($cper_data);
++        $out .= "\n";
++    }
++    if ($out ne "") {
++        print "Extlog events:\n$out\n";
++    } else {
++        print "No Extlog errors.\n\n";
++    }
++    $query_handle->finish;
++
+     # MCE mce_record errors
+     $query = "select id, timestamp, mcgcap, mcgstatus, status, addr, misc, ip, tsc, walltime, cpu, cpuid, apicid, socketid, cs, bank, cpuvendor, bank_name, error_msg, mcgstatus_msg, mcistatus_msg, user_action, mc_location from mce_record order by id";
+     $query_handle = $dbh->prepare($query);

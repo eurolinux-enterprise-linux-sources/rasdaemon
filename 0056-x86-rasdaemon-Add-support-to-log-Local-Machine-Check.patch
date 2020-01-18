@@ -1,0 +1,50 @@
+From fa6260eb1304c6c829af177ab4aa1937db36fab1 Mon Sep 17 00:00:00 2001
+From: Ashok Raj <ashok.raj@intel.com>
+Date: Fri, 5 Jun 2015 13:32:47 -0300
+Subject: [PATCH 1/5] x86, rasdaemon: Add support to log Local Machine Check
+ Exception (LMCE)
+
+Local Machine Check Exception allows certain errors to be signaled to
+only the affected logical processor. This change captures them for
+rasdaemon.
+
+log:Changes to rasdaemon to support new architectural changes to MCE
+
+Changet to rasdaemon to support new architectural extentions in Intel
+CPUs.
+
+Signed-off-by: Ashok Raj <ashok.raj@intel.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel.c       | 2 ++
+ ras-mce-handler.h | 1 +
+ 2 files changed, 3 insertions(+)
+
+diff --git a/mce-intel.c b/mce-intel.c
+index 3684602..3503c6a 100644
+--- a/mce-intel.c
++++ b/mce-intel.c
+@@ -185,6 +185,8 @@ static void decode_mcg(struct mce_event *e)
+ 		mce_snprintf(e->mcgstatus_msg, "EIPV");
+ 	if (mcgstatus & MCG_STATUS_MCIP)
+ 		mce_snprintf(e->mcgstatus_msg, "MCIP");
++	if (mcgstatus & MCG_STATUS_LMCE)
++		mce_snprintf(e->mcgstatus_msg, "LMCE");
+ }
+ 
+ static void bank_name(struct mce_event *e)
+diff --git a/ras-mce-handler.h b/ras-mce-handler.h
+index 28aad00..13b8f52 100644
+--- a/ras-mce-handler.h
++++ b/ras-mce-handler.h
+@@ -139,6 +139,7 @@ void tulsa_decode_model(struct mce_event *e);
+ #define MCG_STATUS_RIPV  (1ULL<<0)   /* restart ip valid */
+ #define MCG_STATUS_EIPV  (1ULL<<1)   /* eip points to correct instruction */
+ #define MCG_STATUS_MCIP  (1ULL<<2)   /* machine check in progress */
++#define MCG_STATUS_LMCE  (1ULL<<3)   /* local machine check signaled */
+ 
+ /* Those functions are defined on per-cpu vendor C files */
+ int parse_intel_event(struct ras_events *ras, struct mce_event *e);
+-- 
+1.8.3.1
+

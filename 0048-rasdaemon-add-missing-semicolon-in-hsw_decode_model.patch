@@ -1,0 +1,31 @@
+From abf36efe909c4022260cb4016c54d1ec3ec18cb8 Mon Sep 17 00:00:00 2001
+From: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Date: Tue, 26 May 2015 11:59:37 -0300
+Subject: [PATCH 08/13] rasdaemon: add missing semicolon in hsw_decode_model()
+
+hsw_decode_model() tries to skip decode_bitfield() if IA32_MC4_STATUS indicates
+some internal errors. Unfortunately, here behaves opposite to the intention
+because a semicolon is missing.
+
+Signed-off-by: Seiichi Ikarashi <s.ikarashi@jp.fujitsu.com>
+Signed-off-by: Aristeu Rozanski <aris@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel-haswell.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mce-intel-haswell.c b/mce-intel-haswell.c
+index c32704c..3ac12f2 100644
+--- a/mce-intel-haswell.c
++++ b/mce-intel-haswell.c
+@@ -137,6 +137,7 @@ void hsw_decode_model(struct ras_events *ras, struct mce_event *e)
+                 }
+                 if (EXTRACT(status, 16, 19))
+                         /* PCU internal error */
++                        ;
+                 decode_bitfield(e, status, pcu_mc4);
+                 break;
+         case 5:
+-- 
+1.8.3.1
+

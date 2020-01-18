@@ -1,0 +1,40 @@
+From 85a2ead8f2d6e380be8d8234ba752a558e8027ed Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 18 May 2015 14:19:29 -0300
+Subject: [PATCH 02/13] rasdaemon: decode new simple error code number 6
+
+This patch was based on fa313dd0144596dfa140bd66805367250d6eae9b
+(mcelog)
+
+	mcelog: Decode new simple error code number 6
+
+	Edition 050 of the Intel SDM released in late February 2014
+	includes a new simple error code in "Table 15-8. IA32_MCi_Status
+	[15:0] Simple Error Code Encoding".  Code 6 (0000 0000 0000 0110)
+	has been allocated for the reporting of cases where the BIOS SMM
+	code attempts to execute code outside of the protected SMRR area.
+
+	Signed-off-by: Tony Luck <tony.luck@intel.com>
+	Signed-off-by: Andi Kleen <ak@linux.intel.com>
+
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mce-intel.c b/mce-intel.c
+index 1546a1d..69ea00e 100644
+--- a/mce-intel.c
++++ b/mce-intel.c
+@@ -115,6 +115,7 @@ static char *mca_msg[] = {
+ 	[3] = "External error",
+ 	[4] = "FRC error",
+ 	[5] = "Internal parity error",
++	[6] = "SMM Handler Code Access Violation",
+ };
+ 
+ static char *tracking_msg[] = {
+-- 
+1.8.3.1
+

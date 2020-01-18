@@ -1,0 +1,38 @@
+From 064a74b1202e529b5e16a54218fc17974906af2d Mon Sep 17 00:00:00 2001
+From: Aristeu Rozanski <arozansk@redhat.com>
+Date: Mon, 18 May 2015 14:19:30 -0300
+Subject: [PATCH 03/13] rasdaemon: Add missing entry to Ivy Bridge memory
+ controller decode table
+
+This patch is based on 2577aeb662374cb87169ee675b2e37c06f1aed99 (mcelog)
+
+	mcelog: Add missing entry to Ivy Bridge memory controller decode table
+
+	September 2013 edition of the software developer manual added an
+	entry that had been inadvertently omitted from earlier editions.
+	Add the 0x80 entry for "Corrected memory read error".
+
+	Signed-off-by: Tony Luck <tony.luck@intel.com>
+	Signed-off-by: Andi Kleen <ak@linux.intel.com>
+
+Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ mce-intel-ivb.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/mce-intel-ivb.c b/mce-intel-ivb.c
+index f2a133a..0c5bebc 100644
+--- a/mce-intel-ivb.c
++++ b/mce-intel-ivb.c
+@@ -76,6 +76,7 @@ static char *memctrl_1[] = {
+ 	[0x010] = "Uncorrected patrol scrub error",
+ 	[0x020] = "Corrected spare error",
+ 	[0x040] = "Uncorrected spare error",
++	[0x080] = "Corrected memory read error",
+ 	[0x100] = "iMC, WDB, parity errors",
+ };
+ 
+-- 
+1.8.3.1
+
