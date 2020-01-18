@@ -1,0 +1,601 @@
+From 624d8a1d99a2f3bd06cbc537aff3cc30201ba7c2 Mon Sep 17 00:00:00 2001
+From: Tyler Baicar <tbaicar@codeaurora.org>
+Date: Mon, 12 Jun 2017 16:16:04 -0600
+Subject: [PATCH 1/2] rasdaemon: add support for non standard CPER section
+ events
+
+Add support to handle the non standard CPER section kernel trace
+events which cover RAS errors who's section type is unknown.
+
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ Makefile.am                |   3 +
+ configure.ac               |   9 +++
+ ras-events.c               |  15 +++++
+ ras-events.h               |   8 +++
+ ras-non-standard-handler.c | 147 +++++++++++++++++++++++++++++++++++++++++++++
+ ras-non-standard-handler.h |  26 ++++++++
+ ras-record.c               |  59 ++++++++++++++++++
+ ras-record.h               |  15 +++++
+ ras-report.c               |  80 ++++++++++++++++++++++++
+ ras-report.h               |  18 +++++-
+ 10 files changed, 379 insertions(+), 1 deletion(-)
+ create mode 100644 ras-non-standard-handler.c
+ create mode 100644 ras-non-standard-handler.h
+
+diff --git a/Makefile.am b/Makefile.am
+index a10e4b3..c5811e8 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -24,6 +24,9 @@ endif
+ if WITH_AER
+    rasdaemon_SOURCES += ras-aer-handler.c
+ endif
++if WITH_NON_STANDARD
++   rasdaemon_SOURCES += ras-non-standard-handler.c
++endif
+ if WITH_MCE
+    rasdaemon_SOURCES += ras-mce-handler.c mce-intel.c mce-amd-k8.c \
+ 			mce-intel-p4-p6.c mce-intel-nehalem.c \
+diff --git a/configure.ac b/configure.ac
+index 5af5227..31bf6bd 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -44,6 +44,15 @@ AS_IF([test "x$enable_aer" = "xyes"], [
+ ])
+ AM_CONDITIONAL([WITH_AER], [test x$enable_aer = xyes])
+ 
++AC_ARG_ENABLE([non_standard],
++    AS_HELP_STRING([--enable-non-standard], [enable NON_STANDARD events (currently experimental)]))
++
++AS_IF([test "x$enable_non_standard" = "xyes"], [
++  AC_DEFINE(HAVE_NON_STANDARD,1,"have UNKNOWN_SEC events collect")
++  AC_SUBST([WITH_NON_STANDARD])
++])
++AM_CONDITIONAL([WITH_NON_STANDARD], [test x$enable_non_standard = xyes])
++
+ AC_ARG_ENABLE([mce],
+     AS_HELP_STRING([--enable-mce], [enable MCE events (currently experimental)]))
+ 
+diff --git a/ras-events.c b/ras-events.c
+index 0be7c3f..96aa6f1 100644
+--- a/ras-events.c
++++ b/ras-events.c
+@@ -29,6 +29,7 @@
+ #include "libtrace/event-parse.h"
+ #include "ras-mc-handler.h"
+ #include "ras-aer-handler.h"
++#include "ras-non-standard-handler.h"
+ #include "ras-mce-handler.h"
+ #include "ras-extlog-handler.h"
+ #include "ras-record.h"
+@@ -208,6 +209,10 @@ int toggle_ras_mc_event(int enable)
+ 	rc |= __toggle_ras_mc_event(ras, "ras", "extlog_mem_event", enable);
+ #endif
+ 
++#ifdef HAVE_NON_STANDARD
++	rc |= __toggle_ras_mc_event(ras, "ras", "non_standard_event", enable);
++#endif
++
+ free_ras:
+ 	free(ras);
+ 	return rc;
+@@ -676,6 +681,16 @@ int handle_ras_events(int record_events)
+ 		    "ras", "aer_event");
+ #endif
+ 
++#ifdef HAVE_NON_STANDARD
++        rc = add_event_handler(ras, pevent, page_size, "ras", "non_standard_event",
++                               ras_non_standard_event_handler);
++        if (!rc)
++                num_events++;
++        else
++                log(ALL, LOG_ERR, "Can't get traces from %s:%s\n",
++                    "ras", "non_standard_event");
++#endif
++
+ 	cpus = get_num_cpus(ras);
+ 
+ #ifdef HAVE_MCE
+diff --git a/ras-events.h b/ras-events.h
+index 64e045a..3e1008f 100644
+--- a/ras-events.h
++++ b/ras-events.h
+@@ -68,6 +68,14 @@ enum hw_event_mc_err_type {
+ 	HW_EVENT_ERR_INFO,
+ };
+ 
++/* Should match the code at Kernel's include/acpi/ghes.h */
++enum ghes_severity {
++	GHES_SEV_NO,
++	GHES_SEV_CORRECTED,
++	GHES_SEV_RECOVERABLE,
++	GHES_SEV_PANIC,
++};
++
+ /* Function prototypes */
+ int toggle_ras_mc_event(int enable);
+ int handle_ras_events(int record_events);
+diff --git a/ras-non-standard-handler.c b/ras-non-standard-handler.c
+new file mode 100644
+index 0000000..4c154e5
+--- /dev/null
++++ b/ras-non-standard-handler.c
+@@ -0,0 +1,147 @@
++/*
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++#include "libtrace/kbuffer.h"
++#include "ras-non-standard-handler.h"
++#include "ras-record.h"
++#include "ras-logger.h"
++#include "ras-report.h"
++
++void print_le_hex(struct trace_seq *s, const uint8_t *buf, int index) {
++	trace_seq_printf(s, "%02x%02x%02x%02x", buf[index+3], buf[index+2], buf[index+1], buf[index]);
++}
++
++static char *uuid_le(const char *uu)
++{
++	static char uuid[sizeof("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")];
++	char *p = uuid;
++	int i;
++	static const unsigned char le[16] = {3,2,1,0,5,4,7,6,8,9,10,11,12,13,14,15};
++
++	for (i = 0; i < 16; i++) {
++		p += sprintf(p, "%.2x", uu[le[i]]);
++		switch (i) {
++		case 3:
++		case 5:
++		case 7:
++		case 9:
++			*p++ = '-';
++			break;
++		}
++	}
++
++	*p = 0;
++
++	return uuid;
++}
++
++int ras_non_standard_event_handler(struct trace_seq *s,
++			 struct pevent_record *record,
++			 struct event_format *event, void *context)
++{
++	int len, i, line_count;
++	unsigned long long val;
++	struct ras_events *ras = context;
++	time_t now;
++	struct tm *tm;
++	struct ras_non_standard_event ev;
++
++	/*
++	 * Newer kernels (3.10-rc1 or upper) provide an uptime clock.
++	 * On previous kernels, the way to properly generate an event would
++	 * be to inject a fake one, measure its timestamp and diff it against
++	 * gettimeofday. We won't do it here. Instead, let's use uptime,
++	 * falling-back to the event report's time, if "uptime" clock is
++	 * not available (legacy kernels).
++	 */
++
++	if (ras->use_uptime)
++		now = record->ts/user_hz + ras->uptime_diff;
++	else
++		now = time(NULL);
++
++	tm = localtime(&now);
++	if (tm)
++		strftime(ev.timestamp, sizeof(ev.timestamp),
++			 "%Y-%m-%d %H:%M:%S %z", tm);
++	trace_seq_printf(s, "%s ", ev.timestamp);
++
++	if (pevent_get_field_val(s, event, "sev", record, &val, 1) < 0)
++		return -1;
++	switch (val) {
++	case GHES_SEV_NO:
++		ev.severity = "Informational";
++		break;
++	case GHES_SEV_CORRECTED:
++		ev.severity = "Corrected";
++		break;
++	case GHES_SEV_RECOVERABLE:
++		ev.severity = "Recoverable";
++		break;
++	default:
++	case GHES_SEV_PANIC:
++		ev.severity = "Fatal";
++	}
++	trace_seq_printf(s, "\n %s", ev.severity);
++
++	ev.sec_type = pevent_get_field_raw(s, event, "sec_type", record, &len, 1);
++	if(!ev.sec_type)
++		return -1;
++	trace_seq_printf(s, "\n section type: %s", uuid_le(ev.sec_type));
++	ev.fru_text = pevent_get_field_raw(s, event, "fru_text",
++						record, &len, 1);
++	ev.fru_id = pevent_get_field_raw(s, event, "fru_id",
++						record, &len, 1);
++	trace_seq_printf(s, " fru text: %s fru id: %s ",
++				ev.fru_text,
++				uuid_le(ev.fru_id));
++
++	if (pevent_get_field_val(s, event, "len", record, &val, 1) < 0)
++		return -1;
++	ev.length = val;
++	trace_seq_printf(s, "\n length: %d\n", ev.length);
++
++	ev.error = pevent_get_field_raw(s, event, "buf", record, &len, 1);
++	if(!ev.error)
++		return -1;
++	len = ev.length;
++	i = 0;
++	line_count = 0;
++	trace_seq_printf(s, " error:\n  %08x: ", i);
++	while(len >= 4) {
++		print_le_hex(s, ev.error, i);
++		i+=4;
++		len-=4;
++		if(++line_count == 4) {
++			trace_seq_printf(s, "\n  %08x: ", i);
++			line_count = 0;
++		} else
++			trace_seq_printf(s, " ");
++	}
++
++	/* Insert data into the SGBD */
++#ifdef HAVE_SQLITE3
++	ras_store_non_standard_record(ras, &ev);
++#endif
++
++#ifdef HAVE_ABRT_REPORT
++	/* Report event to ABRT */
++	ras_report_non_standard_event(ras, &ev);
++#endif
++
++	return 0;
++}
+diff --git a/ras-non-standard-handler.h b/ras-non-standard-handler.h
+new file mode 100644
+index 0000000..2b5ac35
+--- /dev/null
++++ b/ras-non-standard-handler.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __RAS_NON_STANDARD_HANDLER_H
++#define __RAS_NON_STANDARD_HANDLER_H
++
++#include "ras-events.h"
++#include "libtrace/event-parse.h"
++
++int ras_non_standard_event_handler(struct trace_seq *s,
++			 struct pevent_record *record,
++			 struct event_format *event, void *context);
++
++void print_le_hex(struct trace_seq *s, const uint8_t *buf, int index);
++
++#endif
+diff --git a/ras-record.c b/ras-record.c
+index 3dc4493..357ab61 100644
+--- a/ras-record.c
++++ b/ras-record.c
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2013 Mauro Carvalho Chehab <mchehab@redhat.com>
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -157,6 +158,57 @@ int ras_store_aer_event(struct ras_events *ras, struct ras_aer_event *ev)
+ }
+ #endif
+ 
++/*
++ * Table and functions to handle ras:non standard
++ */
++
++#ifdef HAVE_NON_STANDARD
++static const struct db_fields non_standard_event_fields[] = {
++		{ .name="id",			.type="INTEGER PRIMARY KEY" },
++		{ .name="timestamp",		.type="TEXT" },
++		{ .name="sec_type",		.type="BLOB" },
++		{ .name="fru_id",		.type="BLOB" },
++		{ .name="fru_text",		.type="TEXT" },
++		{ .name="severity",		.type="TEXT" },
++		{ .name="error",		.type="BLOB" },
++};
++
++static const struct db_table_descriptor non_standard_event_tab = {
++	.name = "non_standard_event",
++	.fields = non_standard_event_fields,
++	.num_fields = ARRAY_SIZE(non_standard_event_fields),
++};
++
++int ras_store_non_standard_record(struct ras_events *ras, struct ras_non_standard_event *ev)
++{
++	int rc;
++	struct sqlite3_priv *priv = ras->db_priv;
++
++	if (!priv || !priv->stmt_non_standard_record)
++		return 0;
++	log(TERM, LOG_INFO, "non_standard_event store: %p\n", priv->stmt_non_standard_record);
++
++	sqlite3_bind_text (priv->stmt_non_standard_record,  1, ev->timestamp, -1, NULL);
++	sqlite3_bind_blob (priv->stmt_non_standard_record,  2, ev->sec_type, -1, NULL);
++	sqlite3_bind_blob (priv->stmt_non_standard_record,  3, ev->fru_id, 16, NULL);
++	sqlite3_bind_text (priv->stmt_non_standard_record,  4, ev->fru_text, -1, NULL);
++	sqlite3_bind_text (priv->stmt_non_standard_record,  5, ev->severity, -1, NULL);
++	sqlite3_bind_blob (priv->stmt_non_standard_record,  6, ev->error, ev->length, NULL);
++
++	rc = sqlite3_step(priv->stmt_non_standard_record);
++	if (rc != SQLITE_OK && rc != SQLITE_DONE)
++		log(TERM, LOG_ERR,
++		    "Failed to do non_standard_event step on sqlite: error = %d\n", rc);
++	rc = sqlite3_reset(priv->stmt_non_standard_record);
++	if (rc != SQLITE_OK && rc != SQLITE_DONE)
++		log(TERM, LOG_ERR,
++		    "Failed reset non_standard_event on sqlite: error = %d\n", rc);
++	log(TERM, LOG_INFO, "register inserted at db\n");
++
++	return rc;
++}
++#endif
++
+ #ifdef HAVE_EXTLOG
+ static const struct db_fields extlog_event_fields[] = {
+ 		{ .name="id",			.type="INTEGER PRIMARY KEY" },
+@@ -450,6 +502,13 @@ int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras)
+ 					 &mce_record_tab);
+ #endif
+ 
++#ifdef HAVE_NON_STANDARD
++	rc = ras_mc_create_table(priv, &non_standard_event_tab);
++	if (rc == SQLITE_OK)
++		rc = ras_mc_prepare_stmt(priv, &priv->stmt_non_standard_record,
++					&non_standard_event_tab);
++#endif
++
+ 		ras->db_priv = priv;
+ 	return 0;
+ }
+diff --git a/ras-record.h b/ras-record.h
+index 5d84297..473ae40 100644
+--- a/ras-record.h
++++ b/ras-record.h
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2013 Mauro Carvalho Chehab <mchehab@redhat.com>
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -56,9 +57,18 @@ struct ras_extlog_event {
+ 	unsigned short cper_data_length;
+ };
+ 
++struct ras_non_standard_event {
++	char timestamp[64];
++	const char *sec_type, *fru_id, *fru_text;
++	const char *severity;
++	const uint8_t *error;
++	uint32_t length;
++};
++
+ struct ras_mc_event;
+ struct ras_aer_event;
+ struct ras_extlog_event;
++struct ras_non_standard_event;
+ struct mce_event;
+ 
+ #ifdef HAVE_SQLITE3
+@@ -77,6 +87,9 @@ struct sqlite3_priv {
+ #ifdef HAVE_EXTLOG
+ 	sqlite3_stmt	*stmt_extlog_record;
+ #endif
++#ifdef HAVE_NON_STANDARD
++	sqlite3_stmt	*stmt_non_standard_record;
++#endif
+ };
+ 
+ int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras);
+@@ -84,6 +97,7 @@ int ras_store_mc_event(struct ras_events *ras, struct ras_mc_event *ev);
+ int ras_store_aer_event(struct ras_events *ras, struct ras_aer_event *ev);
+ int ras_store_mce_record(struct ras_events *ras, struct mce_event *ev);
+ int ras_store_extlog_mem_record(struct ras_events *ras, struct ras_extlog_event *ev);
++int ras_store_non_standard_record(struct ras_events *ras, struct ras_non_standard_event *ev);
+ 
+ #else
+ static inline int ras_mc_event_opendb(unsigned cpu, struct ras_events *ras) { return 0; };
+@@ -91,6 +105,7 @@ static inline int ras_store_mc_event(struct ras_events *ras, struct ras_mc_event
+ static inline int ras_store_aer_event(struct ras_events *ras, struct ras_aer_event *ev) { return 0; };
+ static inline int ras_store_mce_record(struct ras_events *ras, struct mce_event *ev) { return 0; };
+ static inline int ras_store_extlog_mem_record(struct ras_events *ras, struct ras_extlog_event *ev) { return 0; };
++static inline int ras_store_non_standard_record(struct ras_events *ras, struct ras_non_standard_event *ev) { return 0; };
+ 
+ #endif
+ 
+diff --git a/ras-report.c b/ras-report.c
+index 0a05732..1eb9f79 100644
+--- a/ras-report.c
++++ b/ras-report.c
+@@ -1,3 +1,16 @@
++/*
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
+ #include <stdio.h>
+ #include <string.h>
+ #include <unistd.h>
+@@ -196,6 +209,25 @@ static int set_aer_event_backtrace(char *buf, struct ras_aer_event *ev){
+ 	return 0;
+ }
+ 
++static int set_non_standard_event_backtrace(char *buf, struct ras_non_standard_event *ev){
++	char bt_buf[MAX_BACKTRACE_SIZE];
++
++	if(!buf || !ev)
++		return -1;
++
++	sprintf(bt_buf, "BACKTRACE="	\
++						"timestamp=%s\n"	\
++						"severity=%s\n"	\
++						"length=%d\n",	\
++						ev->timestamp,	\
++						ev->severity,	\
++						ev->length);
++
++	strcat(buf, bt_buf);
++
++	return 0;
++}
++
+ static int commit_report_backtrace(int sockfd, int type, void *ev){
+ 	char buf[MAX_BACKTRACE_SIZE];
+ 	char *pbuf = buf;
+@@ -218,6 +250,9 @@ static int commit_report_backtrace(int sockfd, int type, void *ev){
+ 	case MCE_EVENT:
+ 		rc = set_mce_event_backtrace(buf, (struct mce_event *)ev);
+ 		break;
++	case NON_STANDARD_EVENT:
++		rc = set_non_standard_event_backtrace(buf, (struct ras_non_standard_event *)ev);
++		break;
+ 	default:
+ 		return -1;
+ 	}
+@@ -345,6 +380,51 @@ aer_fail:
+ 	}
+ }
+ 
++int ras_report_non_standard_event(struct ras_events *ras, struct ras_non_standard_event *ev){
++	char buf[MAX_MESSAGE_SIZE];
++	int sockfd = 0;
++	int rc = -1;
++
++	memset(buf, 0, sizeof(buf));
++
++	sockfd = setup_report_socket();
++	if(sockfd < 0){
++		return rc;
++	}
++
++	rc = commit_report_basic(sockfd);
++	if(rc < 0){
++		goto non_standard_fail;
++	}
++
++	rc = commit_report_backtrace(sockfd, NON_STANDARD_EVENT, ev);
++	if(rc < 0){
++		goto non_standard_fail;
++	}
++
++	sprintf(buf, "ANALYZER=%s", "rasdaemon-non-standard");
++	rc = write(sockfd, buf, strlen(buf) + 1);
++	if(rc < strlen(buf) + 1){
++		goto non_standard_fail;
++	}
++
++	sprintf(buf, "REASON=%s", "Unknown CPER section problem");
++	rc = write(sockfd, buf, strlen(buf) + 1);
++	if(rc < strlen(buf) + 1){
++		goto non_standard_fail;
++	}
++
++	rc = 0;
++
++non_standard_fail:
++
++	if(sockfd > 0){
++		close(sockfd);
++	}
++
++	return rc;
++}
++
+ int ras_report_mce_event(struct ras_events *ras, struct mce_event *ev){
+ 	char buf[MAX_MESSAGE_SIZE];
+ 	int sockfd = 0;
+diff --git a/ras-report.h b/ras-report.h
+index 7920cdf..c2fcf42 100644
+--- a/ras-report.h
++++ b/ras-report.h
+@@ -1,3 +1,16 @@
++/*
++ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
+ #ifndef __RAS_REPORT_H
+ #define __RAS_REPORT_H
+ 
+@@ -19,7 +32,8 @@
+ enum {
+ 	MC_EVENT,
+ 	MCE_EVENT,
+-	AER_EVENT
++	AER_EVENT,
++	NON_STANDARD_EVENT
+ };
+ 
+ #ifdef HAVE_ABRT_REPORT
+@@ -27,12 +41,14 @@ enum {
+ int ras_report_mc_event(struct ras_events *ras, struct ras_mc_event *ev);
+ int ras_report_aer_event(struct ras_events *ras, struct ras_aer_event *ev);
+ int ras_report_mce_event(struct ras_events *ras, struct mce_event *ev);
++int ras_report_non_standard_event(struct ras_events *ras, struct ras_non_standard_event *ev);
+ 
+ #else
+ 
+ static inline int ras_report_mc_event(struct ras_events *ras, struct ras_mc_event *ev) { return 0; };
+ static inline int ras_report_aer_event(struct ras_events *ras, struct ras_aer_event *ev) { return 0; };
+ static inline int ras_report_mce_event(struct ras_events *ras, struct mce_event *ev) { return 0; };
++static inline int ras_report_non_standard_event(struct ras_events *ras, struct ras_non_standard_event *ev) { return 0; };
+ 
+ #endif
+ 
+-- 
+1.8.3.1
+

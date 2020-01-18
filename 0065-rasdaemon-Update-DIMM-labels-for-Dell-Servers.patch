@@ -1,0 +1,142 @@
+---
+ labels/dell |   96 +++++++++++++++++++++++++++++++++++-------------------------
+ 1 file changed, 56 insertions(+), 40 deletions(-)
+
+--- rasdaemon-0.4.1.orig/labels/dell	2017-08-23 16:14:36.086652150 -0400
++++ rasdaemon-0.4.1/labels/dell	2017-08-23 16:16:59.091057241 -0400
+@@ -4,23 +4,35 @@
+ #  labels are found from the silk screen on the motherboard.
+ #
+ #Vendor: <vendor-name>
++#  Product: <product-name>
+ #  Model: <model-name>
+ #    <label>:  <mc>.<top>.<mid>.<low>
+ #
+ 
+ Vendor: Dell Inc.
+-#### 11G ####
++# 1-socket
++  Product: PowerEdge R220, PowerEdge R330, PowerEdge T330, PowerEdge R230, PowerEdge T130, PowerEdge T30
++    DIMM_A1: 0.0.0;    DIMM_A2: 0.0.1;
++    DIMM_A3: 0.1.0;    DIMM_A4: 0.1.1;
++
++  Product: PowerEdge T110 II, PowerEdge T20
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;
++
++    DIMM_B1:  0.0.1;    DIMM_B2:   0.1.1;
++
++  Product: PowerEdge R320, PowerEdge T320
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;
++    DIMM_A4:  0.0.1;    DIMM_A5:   0.1.1;       DIMM_A6:   0.2.1;
++
+ # 2-socket
+-# PowerEdge R610
+-  Model: 0K399H, 0F0XJ6
++  Product: PowerEdge R610
+     DIMM_A1: 0.0.0;	DIMM_A2:  0.0.1;	DIMM_A3:  0.0.2;
+     DIMM_A4: 0.1.0;	DIMM_A5:  0.1.1;	DIMM_A6:  0.1.2;
+ 
+     DIMM_B1: 1.0.0;	DIMM_B2:  1.0.1;	DIMM_B3:  1.0.2;
+     DIMM_B4: 1.1.0;	DIMM_B5:  1.1.1;	DIMM_B6:  1.1.2;
+ 
+-# PowerEdge T710	R710
+-  Model: 01CTXG,	0N0H4P, 0MD99X, 0N047H, 0PV9DG
++  Product: PowerEdge T710, PowerEdge R710
+     DIMM_A3: 0.0.0;	DIMM_A2:  0.1.0;	DIMM_A1:  0.2.0;
+     DIMM_A6: 0.0.1;	DIMM_A5:  0.1.1;	DIMM_A4:  0.2.1;
+     DIMM_A9: 0.0.2;	DIMM_A8:  0.1.2;	DIMM_A7:  0.2.2;
+@@ -29,27 +41,7 @@ DIMM_B3: 1.0.0;	DIMM_B2:  1.1.0;	DIMM_B1
+     DIMM_B6: 1.0.1;	DIMM_B5:  1.1.1;	DIMM_B4:  1.2.1;
+     DIMM_B9: 1.0.2;	DIMM_B8:  1.1.2;	DIMM_B7:  1.2.2;
+ 
+-#### 12/13G ####
+-# 1-socket
+-# PowerEdge R220
+-  Model: 081N4V
+-    DIMM_A1: 0.0.0;    DIMM_A2: 0.0.1;
+-    DIMM_A3: 0.1.0;    DIMM_A4: 0.1.1;
+-
+-#PowerEdge T110 II, T20
+-  Model: 0PC2WT, 0PM2CW, 015TH9,  0MDHN4, 0VD5HY
+-    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;
+-
+-    DIMM_B1:  0.0.1;    DIMM_B2:   0.1.1;
+-
+-#PowerEdge R320 T320
+-  Model: 0YCV59, 0Y97HY, 07DKYR, 0VJ84C,  07MYHN, 04DMNN, 0W7H8C, 0K20G5, 0V719V, 0FDT3J
+-    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;
+-    DIMM_A4:  0.0.1;    DIMM_A5:   0.1.1;       DIMM_A6:   0.2.1;
+-
+-# 2-socket
+-# PowerEdge R620/T620			R720/xd					R730/xd		T630	R730		R630	T620	M620, FC620
+-  Model: 0VWT90, 07NDJ2, 0F5XM3,	0PXXHP, 0X3D66, 061P35, 0H5J4J, 00W9X3,	0599V5,		0W9WXC, 0599V5, 0H21J3, 0CNCJW,  02CD1V, 0T5TFW, 0F5XM3, 0G1CNH,  05YV77, 0PDCCX, 093MW8, 0NJVT7
++  Product: PowerEdge R620, PowerEdge T620, PowerEdge R720xd, PowerEdge R730xd, PowerEdge T630, PowerEdge R730, PowerEdge R630, PowerEdge T620, PowerEdge M620, PowerEdge FC620, PowerEdge M630, PowerEdge FC630
+     DIMM_A1:  0.0.0;	DIMM_A2:   0.1.0;	DIMM_A3:   0.2.0;	DIMM_A4:   0.3.0;
+     DIMM_A5:  0.0.1;	DIMM_A6:   0.1.1;	DIMM_A7:   0.2.1;	DIMM_A8:   0.3.1;
+     DIMM_A9:  0.0.2;	DIMM_A10:  0.1.2;	DIMM_A11:  0.2.2;	DIMM_A12:  0.3.2;
+@@ -58,23 +50,38 @@ DIMM_B1:  1.0.0;	DIMM_B2:   1.1.0;	DIMM_
+     DIMM_B5:  1.0.1;	DIMM_B6:   1.1.1;	DIMM_B7:   1.2.1;	DIMM_B8:   1.3.1;
+     DIMM_B9:  1.0.2;	DIMM_B10:  1.1.2;	DIMM_B11:  1.2.2;	DIMM_B12:  1.3.2;
+ 
+-# PowerEdge M520		R420								   T420
+-  Model: 0NRG83, 0DW6GX,	03WPHJ, 06HTRX, 0H1Y24, 02T9N6,  0TT5P2, 0CPKXG, 03015M, 061VPC,   0PC9H0, 0K3G34, 0PC0V5, 08NVYK
+-    DIMM_A1:  0.0.0;	DIMM_A2:   0.1.0;	DIMM_A3:   0.2.0;
+-    DIMM_A4:  0.0.1;	DIMM_A5:   0.1.1;	DIMM_A6:   0.2.1;
+-
+-    DIMM_B1:  1.0.0;	DIMM_B2:   1.1.0;	DIMM_B3:   1.2.0;
+-    DIMM_B4:  1.0.1;	DIMM_B5:   1.1.1;	DIMM_B6:   1.2.1;
+-
+-#PowerEdge FC420, M420
+-  Model: 0DPJGD, 068CTP, 0MN3VC, 0417VP
+-     DIMM_A1:  0.0.0;   DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;
++  Product: PowerEdge M520, PowerEdge R420, PowerEdge T420
++    DIMM_A1:  0.1.0;	DIMM_A2:   0.2.0;	DIMM_A3:   0.3.0;
++    DIMM_A4:  0.1.1;	DIMM_A5:   0.2.1;	DIMM_A6:   0.3.1;
++
++    DIMM_B1:  1.1.0;	DIMM_B2:   1.2.0;	DIMM_B3:   1.3.0;
++    DIMM_B4:  1.1.1;	DIMM_B5:   1.2.1;	DIMM_B6:   1.3.1;
+ 
+-     DIMM_B1:  1.0.0;   DIMM_B2:   1.1.0;       DIMM_B3:   1.2.0;
++  Product: PowerEdge FC420, PowerEdge M420
++    DIMM_A1:  0.0.0;   DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;
++
++    DIMM_B1:  1.0.0;   DIMM_B2:   1.1.0;       DIMM_B3:   1.2.0;
++
++  Product: PowerEdge C6320, PowerEdge C4130
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;       DIMM_A4:   0.3.0;
++    DIMM_A5:  0.0.1;    DIMM_A6:   0.1.1;       DIMM_A7:   0.2.1;       DIMM_A8:   0.3.1;
++
++    DIMM_B1:  1.0.0;    DIMM_B2:   1.1.0;       DIMM_B3:   1.2.0;       DIMM_B4:   1.3.0;
++    DIMM_B5:  1.0.1;    DIMM_B6:   1.1.1;       DIMM_B7:   1.2.1;       DIMM_B8:   1.3.1;
++
++  Product: PowerEdge R430, PowerEdge T430, PowerEdge R530
++    DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;       DIMM_A4:   0.3.0;
++    DIMM_A5:  0.0.1;    DIMM_A6:   0.1.1;       DIMM_A7:   0.2.1;       DIMM_A8:   0.3.1;
++
++    DIMM_B1:  1.0.0;    DIMM_B2:   1.1.0;       DIMM_B3:   1.2.0;       DIMM_B4:   1.3.0;
++
++  Product: PowerEdge FC430
++    DIMM_A1:  0.1.0;    DIMM_A2:   0.0.0;       DIMM_A3:   0.2.0;       DIMM_A4:   0.3.0;
++
++    DIMM_B1:  1.1.0;    DIMM_B2:   1.0.0;       DIMM_B3:   1.2.0;       DIMM_B4:   1.3.0;
+ 
+ # 4-socket
+-# # PowerEdge M820
+-  Model: 0RN9TC, 0YWR73, 066N7P, 0PFG1N, 0JC2W3
++  Product: PowerEdge M820, PowerEdge R830, PowerEdge M830, PowerEdge R930, PowerEdge FC830
+     DIMM_A1:  0.0.0;    DIMM_A2:   0.1.0;       DIMM_A3:   0.2.0;       DIMM_A4:   0.3.0;
+     DIMM_A5:  0.0.1;    DIMM_A6:   0.1.1;       DIMM_A7:   0.2.1;       DIMM_A8:   0.3.1;
+     DIMM_A9:  0.0.2;    DIMM_A10:  0.1.2;       DIMM_A11:  0.2.2;       DIMM_A12:  0.3.2;
+@@ -90,3 +97,12 @@ DIMM_C9:  2.0.2;    DIMM_C10:  2.1.2;
+     DIMM_D1:  3.0.0;    DIMM_D2:   3.1.0;       DIMM_D3:   3.2.0;       DIMM_D4:   3.3.0;
+     DIMM_D5:  3.0.1;    DIMM_D6:   3.1.1;       DIMM_D7:   3.2.1;       DIMM_D8:   3.3.1;
+     DIMM_D9:  3.0.2;    DIMM_D10:  3.1.2;       DIMM_D11:  3.2.2;       DIMM_D12:  3.3.2;
++
++  Product: PowerEdge FM120x4
++    DIMM_A_A1:  0.1.0;    DIMM_A_A2:   0.2.0;
++
++    DIMM_B_A1:  1.1.0;    DIMM_B_A2:   1.2.0;
++
++    DIMM_C_A1:  2.1.0;    DIMM_C_A2:   2.2.0;
++
++    DIMM_D_A1:  3.1.0;    DIMM_D_A2:   3.2.0;

@@ -1,0 +1,27 @@
+commit 1b23bf7d97bacd1d00adb4404dfc5004df394358
+Author: Aristeu Rozanski <arozansk@redhat.com>
+Date:   Fri Feb 2 10:15:25 2018 -0500
+
+    ARM: initialize with 0 unused ras_arm_event members
+    
+    Issue found by covscan:
+    
+    1. rasdaemon-0.4.1/ras-arm-handler.c:32: var_decl: Declaring variable "ev" without initializer.
+    16. rasdaemon-0.4.1/ras-arm-handler.c:81: uninit_use_in_call: Using uninitialized value "ev.error_count" when calling "ras_store_arm_record".
+    23. rasdaemon-0.4.1/ras-record.c:243:2: read_parm_fld: Reading a parameter field.
+    
+    Signed-off-by: Aristeu Rozanski <arozansk@redhat.com>
+
+diff --git a/ras-arm-handler.c b/ras-arm-handler.c
+index a76470d..2f170e2 100644
+--- a/ras-arm-handler.c
++++ b/ras-arm-handler.c
+@@ -31,6 +31,8 @@ int ras_arm_event_handler(struct trace_seq *s,
+ 	struct tm *tm;
+ 	struct ras_arm_event ev;
+ 
++	memset(&ev, 0, sizeof(ev));
++
+ 	/*
+ 	 * Newer kernels (3.10-rc1 or upper) provide an uptime clock.
+ 	 * On previous kernels, the way to properly generate an event would

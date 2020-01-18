@@ -2,11 +2,11 @@
 
 Name:			rasdaemon
 Version:		0.4.1
-Release:		28%{?dist}
+Release:		32%{?dist}
 Summary:		Utility to receive RAS error tracings
 Group:			Applications/System
 License:		GPLv2
-URL:			https://git.fedorahosted.org/git/rasdaemon.git
+URL:			https://pagure.io/rasdaemon
 Source0:		http://mchehab.fedorapeople.org/%{name}-%{version}.tar.bz2
 
 ExclusiveArch:		%{ix86} x86_64 aarch64 %{power64}
@@ -79,6 +79,12 @@ Patch52: 0062-Add-Broadwell-EP-EX-MSCOD-values.patch
 Patch53: rasdaemon-dont_use_memerror_log_enable_on_knl.patch
 Patch54: 0063-add_support_for_knights_mill.patch
 Patch55: 0064-add_support_for_skylake.patch
+Patch56: 0065-rasdaemon-Update-DIMM-labels-for-Dell-Servers.patch
+Patch57: 0066-rasdaemon-Update-DIMM-labels-for-Intel-Skylake-serve.patch
+Patch58: 0067-rasdaemon-add-support-for-non-standard-CPER-section-.patch
+Patch59: 0068-rasdaemon-add-support-for-non-standard-error-decoder.patch
+Patch60: 0069-rasdaemon-add-support-for-ARM-events.patch
+Patch61: 0070-rasdaemon-ARM-fully-initialize-ras_arm_event.patch
 
 %description
 %{name} is a RAS (Reliability, Availability and Serviceability) logging tool.
@@ -147,10 +153,16 @@ an utility for reporting current error counts from the EDAC sysfs files.
 %patch53 -p1
 %patch54 -p1
 %patch55 -p1
+%patch56 -p1
+%patch57 -p1
+%patch58 -p1
+%patch59 -p1
+%patch60 -p1
+%patch61 -p1
 
 %build
 autoreconf -vfi
-%configure --enable-mce --enable-aer --enable-sqlite3 --enable-extlog
+%configure --enable-mce --enable-aer --enable-sqlite3 --enable-extlog --enable-arm
 make %{?_smp_mflags}
 
 %install
@@ -174,6 +186,18 @@ rm -rf %{buildroot}
 %{_sysconfdir}/ras/dimm_labels.d
 
 %changelog
+* Fri Feb 02 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-32.el7
+- Fixed covscan error [1520602]
+
+* Wed Jan 24 2018 Aristeu Rozanski <aris@redhat.com> 0.4.1-31.el7
+- Added ARM support [1520602]
+
+* Thu Oct 19 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-30.el7
+- Updated project url [1502400]
+
+* Wed Aug 23 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-29.el7
+- Updating Dell labels [1458938]
+
 * Tue May 30 2017 Aristeu Rozanski <aris@redhat.com> 0.4.1-28.el7
 - Bump release [1448113]
 
